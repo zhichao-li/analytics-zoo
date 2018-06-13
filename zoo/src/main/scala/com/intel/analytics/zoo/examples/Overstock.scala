@@ -14,7 +14,6 @@ class Overstock {
 
 }
 
-// we need a evaluate method for debug purpose.
 object Overstock {
 
   // yTrue: (batch, 1), yPred: (batch, 1)
