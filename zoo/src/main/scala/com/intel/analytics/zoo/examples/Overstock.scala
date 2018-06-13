@@ -76,7 +76,7 @@ object Overstock {
   }
 
   def main(args: Array[String]): Unit = {
-    //    testModel()
+    testModel()
     testLoss()
   }
 }
