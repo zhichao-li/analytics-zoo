@@ -27,6 +27,7 @@ object Overstock {
     val chargebackRecovery = 0.18
     val labor = 2.05
     // axis = 0 is batch, so we need to set keepdims = true
+    // BinaryThreshold meaning if (x <=0.5) {x = 0} else {x = 1}
     val truePositive = A.sum(yTrue * BinaryThreshold[Float](0.5).from(yPred), axis = 0, keepdims = true)
     val falsePositive = A.sum(BinaryThreshold[Float](0.5).from(yTrue - yPred), axis = 0, keepdims = true)
     val falseNegative = A.sum(BinaryThreshold[Float](0.5).from(yPred - yTrue), axis = 0, keepdims = true)
