@@ -26,8 +26,8 @@ object Overstock {
     val leakageRate = 0.0123
     val chargebackRecovery = 0.18
     val labor = 2.05
-    val binaryPred = BinaryThreshold[Float](0.5).from(yPred)
-    val truePositive = A.sum(yTrue * binaryPred, axis = 0, keepdims = true)
+    // axis = 0 is batch, so we need to set keepdims = true
+    val truePositive = A.sum(yTrue * BinaryThreshold[Float](0.5).from(yPred), axis = 0, keepdims = true)
     val falsePositive = A.sum(BinaryThreshold[Float](0.5).from(yTrue - yPred), axis = 0, keepdims = true)
     val falseNegative = A.sum(BinaryThreshold[Float](0.5).from(yPred - yTrue), axis = 0, keepdims = true)
 
