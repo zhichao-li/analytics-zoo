@@ -40,7 +40,7 @@ object Overstock {
     return FNLoss + TPLoss + FPLoss + TNLoss
   }
 
-  val customLoss = CustomLoss[Float](cLoss _, sizeAverage = true)
+  val customLoss = CustomLoss[Float](cLoss, Shape(1), sizeAverage = true)
 
   def lr(): KerasNet[Float] = {
     val seq = Sequential[Float]()
