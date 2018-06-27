@@ -14,60 +14,39 @@
 # limitations under the License.
 #
 from __future__ import print_function
-import os
-import sys
-import time
-import json
+
 import argparse
+import json
 import random
+
 random.seed(49999)
 import numpy
 numpy.random.seed(49999)
 import tensorflow
 tensorflow.set_random_seed(49999)
 
-from collections import OrderedDict
-
-from zoo.pipeline.api.autograd import *
-from zoo.pipeline.api.keras.layers import *
 from zoo.pipeline.api.keras.models import *
 from bigdl.keras.converter import WeightsConverter
-from test.zoo.pipeline.utils.test_utils import ZooTestCase
 import numpy as np
 
-from utils import *
-import inputs
-import metrics
+from zoo.examples.knrm.model.knrm import KNRM as zoo_KNRM
+from zoo.examples.knrm.model.knrm_keras2 import KNRM2 as keras_KNRM
 
-np.random.seed(1330)
 
 config = tensorflow.ConfigProto()
 config.gpu_options.allow_growth = True
 sess = tensorflow.Session(config = config)
 
-def load_model(config):
+def load_model(config, model_class):
     global_conf = config["global"]
     model_type = global_conf['model_type']
     model_config = config['model']['setting']
     model_config.update(config['inputs']['share'])
     sys.path.insert(0, config['model']['model_path'])
 
-    model = import_object(config['model']['model_py'], model_config)
+    model = model_class(model_config)
     mo = model.build()
     return mo
-
-def load_keras2_model(config):
-    global_conf = config["global"]
-    model_type = global_conf['model_type']
-    model_config = config['keras2model']['setting']
-    model_config.update(config['inputs']['share'])
-    sys.path.insert(0, config['keras2model']['model_path'])
-
-    model = import_object(config['keras2model']['model_py'], model_config)
-    mo = model.build()
-    return mo
-
-
 
 def standardize_input_data(data, names, shapes=None,
                            check_batch_axis=True,
@@ -147,65 +126,52 @@ def standardize_input_data(data, names, shapes=None,
                             str(data_shape))
     return data
 
-
-def predict(config):
-    ######## Read input config ########
-
-
-    model = load_model(config)
-    # model.load_weights(weights_file)
-    keras2_model = load_keras2_model(config)
-
-    ######## Get and Set Weights ########
-    query_embedding = keras2_model.get_layer("query_embedding")
-    query_weights = query_embedding.get_weights()
-    zquery_weights = WeightsConverter.to_bigdl_weights(query_embedding, query_weights)
-    zquery_embedding = [l for l in model.layers if l.name() == "query_embedding"][0]
-    zquery_embedding.set_weights(zquery_weights)
-
-    # doc_embedding = keras2_model.get_layer("doc_embedding")
-    # doc_weights = doc_embedding.get_weights()
-    # zdoc_weights = WeightsConverter.to_bigdl_weights(doc_embedding, doc_weights)
-    # zdoc_embedding = [l for l in model.layers if l.name() == "doc_embedding"][0]
-    # zdoc_embedding.set_weights(zdoc_weights)
-
-    dense = keras2_model.get_layer("dense")
-    dense_weights = dense.get_weights()
-    zdense_weights = WeightsConverter.to_bigdl_weights(dense, dense_weights)
-    zdense = [l for l in model.layers if l.name() == "dense"][0]
-    zdense.set_weights(zdense_weights)
+def set_weights_per_layer(kmodel, zmodel, layer_name):
+    klayer = kmodel.get_layer(layer_name)
+    klayer_weights = klayer.get_weights()
+    zlayer_weights = WeightsConverter.to_bigdl_weights(klayer, klayer_weights)
+    zlayer = [l for l in zmodel.layers if l.name() == layer_name][0] # assert the result length is 1
+    zlayer.set_weights(zlayer_weights)
 
 
-
-    batch_size = 200
+def generate_dummy(batch_size):
+    batch_size = batch_size
     query_data = np.random.randint(0, 10000, [batch_size, 10])
     doc_data = np.random.randint(0, 10000, [batch_size, 40])
-    input_data = [query_data, doc_data]
-    keras2_y_pred = keras2_model.predict(input_data, batch_size=batch_size)
+    return [query_data, doc_data]
+
+def predict(config, input_data, batch_size):
+    ######## Read input config ########
+    model = load_model(config, zoo_KNRM)
+    # model.load_weights(weights_file)
+    kmodel = load_model(config, keras_KNRM)
+
+    ######## Get and Set Weights ########
+    set_weights_per_layer(kmodel, model, "query_embedding")
+    set_weights_per_layer(kmodel, model, "dense")
+
+    keras2_y_pred = kmodel.predict(input_data, batch_size=batch_size)
     y_pred = model.forward(input_data)
     # y_pred = model.predict(input_data, distributed=False)
-
     equal = np.allclose(y_pred, keras2_y_pred, rtol=1e-5, atol=1e-5)
-    equal
-   # 16
-
+    print(equal)
+    return y_pred
 
 def main(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--phase', default='train', help='Phase: Can be train or predict, the default value is train.')
-    parser.add_argument('--model_file', default='./models/knrm_wikiqa.config', help='Model_file: MatchZoo model file for the chosen model.')
+    parser.add_argument('--phase', default='predict', help='Phase: Can be train or predict, the default value is train.')
+    parser.add_argument('--model_file', default='./model/knrm_wikiqa.config', help='Model_file: MatchZoo model file for the chosen model.')
     args = parser.parse_args()
     model_file =  args.model_file
     with open(model_file, 'r') as f:
         config = json.load(f)
-    phase = args.phase
-    # if args.phase == 'train':
-    #     train(config)
-    # elif args.phase == 'predict':
-    #     predict(config)
-    # else:
-    #     print('Phase Error.', end='\n')
-    predict(config)
+    if args.phase == 'train':
+        train(config)
+    elif args.phase == 'predict':
+        batch_size = 200
+        predict(config, generate_dummy(batch_size), batch_size)
+    else:
+        print('Phase Error.', end='\n')
     return
 
 if __name__=='__main__':
