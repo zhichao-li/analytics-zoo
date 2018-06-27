@@ -151,66 +151,6 @@ def standardize_input_data(data, names, shapes=None,
 def predict(config):
     ######## Read input config ########
 
-    print(json.dumps(config, indent=2), end='\n')
-    input_conf = config['inputs']
-    share_input_conf = input_conf['share']
-
-    # collect embedding
-    if 'embed_path' in share_input_conf:
-        embed_dict = read_embedding(filename=share_input_conf['embed_path'])
-        _PAD_ = share_input_conf['vocab_size'] - 1
-        embed_dict[_PAD_] = np.zeros((share_input_conf['embed_size'], ), dtype=np.float32)
-        embed = np.float32(np.random.uniform(-0.02, 0.02, [share_input_conf['vocab_size'], share_input_conf['embed_size']]))
-        share_input_conf['embed'] = convert_embed_2_numpy(embed_dict, embed = embed)
-    else:
-        embed = np.float32(np.random.uniform(-0.2, 0.2, [share_input_conf['vocab_size'], share_input_conf['embed_size']]))
-        share_input_conf['embed'] = embed
-    print('[Embedding] Embedding Load Done.', end='\n')
-
-    # list all input tags and construct tags config
-    input_predict_conf = OrderedDict()
-    for tag in input_conf.keys():
-        if 'phase' not in input_conf[tag]:
-            continue
-        if input_conf[tag]['phase'] == 'PREDICT':
-            input_predict_conf[tag] = {}
-            input_predict_conf[tag].update(share_input_conf)
-            input_predict_conf[tag].update(input_conf[tag])
-    print('[Input] Process Input Tags. %s in PREDICT.' % (input_predict_conf.keys()), end='\n')
-
-    # collect dataset identification
-    dataset = {}
-    for tag in input_conf:
-        if tag == 'share' or input_conf[tag]['phase'] == 'PREDICT':
-            if 'text1_corpus' in input_conf[tag]:
-                datapath = input_conf[tag]['text1_corpus']
-                if datapath not in dataset:
-                    dataset[datapath], _ = read_data(datapath)
-            if 'text2_corpus' in input_conf[tag]:
-                datapath = input_conf[tag]['text2_corpus']
-                if datapath not in dataset:
-                    dataset[datapath], _ = read_data(datapath)
-    print('[Dataset] %s Dataset Load Done.' % len(dataset), end='\n')
-
-    # initial data generator
-    predict_gen = OrderedDict()
-
-    for tag, conf in input_predict_conf.items():
-        print(conf, end='\n')
-        conf['data1'] = dataset[conf['text1_corpus']]
-        conf['data2'] = dataset[conf['text2_corpus']]
-        generator = inputs.get(conf['input_type'])
-        predict_gen[tag] = generator(
-                                    #data1 = dataset[conf['text1_corpus']],
-                                    #data2 = dataset[conf['text2_corpus']],
-                                     config = conf )
-
-    ######## Read output config ########
-    output_conf = config['outputs']
-
-    ######## Load Model ########
-    global_conf = config["global"]
-    weights_file = str(global_conf['weights_file']) + '.' + str(global_conf['test_weights_iters'])
 
     model = load_model(config)
     # model.load_weights(weights_file)
@@ -223,97 +163,32 @@ def predict(config):
     zquery_embedding = [l for l in model.layers if l.name() == "query_embedding"][0]
     zquery_embedding.set_weights(zquery_weights)
 
-    doc_embedding = keras2_model.get_layer("doc_embedding")
-    doc_weights = doc_embedding.get_weights()
-    zdoc_weights = WeightsConverter.to_bigdl_weights(doc_embedding, doc_weights)
-    zdoc_embedding = [l for l in model.layers if l.name() == "doc_embedding"][0]
-    zdoc_embedding.set_weights(zdoc_weights)
-    #
-    # dense = keras2_model.get_layer("dense")
-    # dense_weights = dense.get_weights()
-    # zdense_weights = WeightsConverter.to_bigdl_weights(dense, dense_weights)
-    # zdense = [l for l in model.layers if l.name() == "dense"][0]
-    # zdense.set_weights(zdense_weights)
+    # doc_embedding = keras2_model.get_layer("doc_embedding")
+    # doc_weights = doc_embedding.get_weights()
+    # zdoc_weights = WeightsConverter.to_bigdl_weights(doc_embedding, doc_weights)
+    # zdoc_embedding = [l for l in model.layers if l.name() == "doc_embedding"][0]
+    # zdoc_embedding.set_weights(zdoc_weights)
 
-    eval_metrics = OrderedDict()
-    for mobj in config['metrics']:
-        mobj = mobj.lower()
-        if '@' in mobj:
-            mt_key, mt_val = mobj.split('@', 1)
-            eval_metrics[mobj] = metrics.get(mt_key)(int(mt_val))
-        else:
-            eval_metrics[mobj] = metrics.get(mobj)
-    res = dict([[k,0.] for k in eval_metrics.keys()])
+    dense = keras2_model.get_layer("dense")
+    dense_weights = dense.get_weights()
+    zdense_weights = WeightsConverter.to_bigdl_weights(dense, dense_weights)
+    zdense = [l for l in model.layers if l.name() == "dense"][0]
+    zdense.set_weights(zdense_weights)
 
-    batch_size = 20
+
+
+    batch_size = 200
     query_data = np.random.randint(0, 10000, [batch_size, 10])
     doc_data = np.random.randint(0, 10000, [batch_size, 40])
     input_data = [query_data, doc_data]
     keras2_y_pred = keras2_model.predict(input_data, batch_size=batch_size)
-    y_pred = model.predict(input_data, distributed=False)
+    y_pred = model.forward(input_data)
+    # y_pred = model.predict(input_data, distributed=False)
+
     equal = np.allclose(y_pred, keras2_y_pred, rtol=1e-5, atol=1e-5)
+    equal
    # 16
-    for tag, generator in predict_gen.items():
-        genfun = generator.get_batch_generator()
-        print('[%s]\t[Predict] @ %s ' % (time.strftime('%m-%d-%Y %H:%M:%S', time.localtime(time.time())), tag), end='')
-        num_valid = 0
-        res_scores = {}
-        for input_data, y_true in genfun:
-            keras2_y_pred = keras2_model.predict(input_data, batch_size=len(y_true))
-            names = ['query', 'doc']
-            shapes = [(None, 10), (None, 40)]
-            list_input_data = standardize_input_data(input_data, names, shapes, check_batch_axis=False)
-           # list_input_data = [data[0:2, :] for data in list_input_data]
-            sout = model.get_output_shape()
-            fout = model.forward(list_input_data)
-            y_pred = model.predict(list_input_data, distributed=False) #y_pred = model.predict(input_data, batch_size=len(y_true) )
-            equal = np.allclose(y_pred, keras2_y_pred, rtol=1e-5, atol=1e-5)
-            print(equal)
 
-            if issubclass(type(generator), inputs.list_generator.ListBasicGenerator):
-                list_counts = input_data['list_counts']
-                for k, eval_func in eval_metrics.items():
-                    for lc_idx in range(len(list_counts)-1):
-                        pre = list_counts[lc_idx]
-                        suf = list_counts[lc_idx+1]
-                        res[k] += eval_func(y_true = y_true[pre:suf], y_pred = y_pred[pre:suf])
-
-                y_pred = np.squeeze(y_pred)
-                for lc_idx in range(len(list_counts)-1):
-                    pre = list_counts[lc_idx]
-                    suf = list_counts[lc_idx+1]
-                    for p, y, t in zip(input_data['ID'][pre:suf], y_pred[pre:suf], y_true[pre:suf]):
-                        if p[0] not in res_scores:
-                            res_scores[p[0]] = {}
-                        res_scores[p[0]][p[1]] = (y, t)
-
-                num_valid += len(list_counts) - 1
-            else:
-                for k, eval_func in eval_metrics.items():
-                    res[k] += eval_func(y_true = y_true, y_pred = y_pred)
-                for p, y, t in zip(input_data['ID'], y_pred, y_true):
-                    if p[0] not in res_scores:
-                        res_scores[p[0]] = {}
-                    res_scores[p[0]][p[1]] = (y[1], t[1])
-                num_valid += 1
-        generator.reset()
-
-        if tag in output_conf:
-            if output_conf[tag]['save_format'] == 'TREC':
-                with open(output_conf[tag]['save_path'], 'w') as f:
-                    for qid, dinfo in res_scores.items():
-                        dinfo = sorted(dinfo.items(), key=lambda d:d[1][0], reverse=True)
-                        for inum,(did, (score, gt)) in enumerate(dinfo):
-                            f.write('%s\tQ0\t%s\t%d\t%f\t%s\t%s\n'%(qid, did, inum, score, config['net_name'], gt))
-            elif output_conf[tag]['save_format'] == 'TEXTNET':
-                with open(output_conf[tag]['save_path'], 'w') as f:
-                    for qid, dinfo in res_scores.items():
-                        dinfo = sorted(dinfo.items(), key=lambda d:d[1][0], reverse=True)
-                        for inum,(did, (score, gt)) in enumerate(dinfo):
-                            f.write('%s %s %s %s\n'%(gt, qid, did, score))
-
-        print('[Predict] results: ', '\t'.join(['%s=%f'%(k,v/num_valid) for k, v in res.items()]), end='\n')
-        sys.stdout.flush()
 
 def main(argv):
     parser = argparse.ArgumentParser()

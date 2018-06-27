@@ -26,8 +26,8 @@ class KNRM(BasicModel):
     def __init__(self, config):
         super(KNRM, self).__init__(config)
         self._name = 'KNRM'
-        self.check_list = [ 'text1_maxlen', 'kernel_num','sigma','exact_sigma',
-                            'embed', 'embed_size', 'vocab_size']
+        self.check_list = [] #[ 'text1_maxlen', 'kernel_num','sigma','exact_sigma',
+                            #'embed', 'embed_size', 'vocab_size']
         self.setup(config)
         if not self.check():
             raise TypeError('[KNRM] parameter check wrong')
@@ -41,6 +41,13 @@ class KNRM(BasicModel):
             raise TypeError('parameter config should be dict:', config)
         self.config.update(config)
 
+    def share(self, layer, in1, in2):
+        import zoo.pipeline.api.keras.layers as layer1
+        merged = layer1.merge([in1, in2], mode="concat", concat_axis=1)
+        shared_out = layer(merged)
+        out1 = shared_out.slice(1, 0, 10)
+        out2 = shared_out.slice(1, 10, 40)
+        return out1, out2
 
     def build(self):
         def Kernel_layer(mu,sigma):
@@ -82,15 +89,16 @@ class KNRM(BasicModel):
         # test_out = Dense(1)(doc)
         #we do not support sharing weights in one embedding
         embedding1 = Embedding(self.config['vocab_size'], self.config['embed_size'], name="query_embedding") #trainable=self.config['train_embed'] weights=[self.config['embed']]
-        q_embed = embedding1(query)
+        # q_embed = embedding1(query)
         #show_layer_info('Embedding', q_embed)
-        embedding2 = Embedding(self.config['vocab_size'], self.config['embed_size'], name="doc_embedding")
-        d_embed = embedding2(doc)
+        # embedding2 = Embedding(self.config['vocab_size'], self.config['embed_size'], name="doc_embedding")
+        # d_embed = embedding2(doc)
+        q_embed, d_embed = self.share(embedding1, query, doc)
         #show_layer_info('Embedding', d_embed)
         mm = A.dot(q_embed, d_embed, axes=[2, 2], normalize=False)
         #mm = A.sum(q_embed * d_embed, axis=2) # Dot(axes=[2, 2], normalize=True)([q_embed, d_embed])
         #show_layer_info('Dot', mm)
-        tout_ = mm
+        # tout_ = mm
 
         KM = []
         for i in range(self.config['kernel_num']):
@@ -119,8 +127,8 @@ class KNRM(BasicModel):
             out_ = Dense(1, bias_initializer='zero', name="dense")(Phi)
         # show_layer_info('Dense', out_)
         # model = Model(input=[doc], output=[test_out])
-        # model = Model(input=[query, doc], output=[out_])
-        model = Model(input=[query, doc], output=[tout_])
+        model = Model(input=[query, doc], output=[out_])
+        # model = Model(input=[query, doc], output=[tout_])
 
         # query_embedding = [l for l in model.layers if l.name() == "query_embedding"][0]
         # query_embedding.get_weights()

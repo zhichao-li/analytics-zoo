@@ -286,7 +286,7 @@ object TFNet {
       })
     }
 
-    private def readObject(in: java.io.ObjectInputStream): Unit = {
+     def readObject(in: java.io.ObjectInputStream): Unit = {
       readInternal(new CommonInputStream {
         override def read(buff: Array[Byte], off: Int, len: Int): Int = in.read(buff, off, len)
 
