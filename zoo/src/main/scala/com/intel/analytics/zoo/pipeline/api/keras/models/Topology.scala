@@ -24,8 +24,9 @@ import com.intel.analytics.bigdl.nn.keras.{KerasLayer, KerasLayerSerializable}
 import com.intel.analytics.bigdl.nn.{Container, Graph, StaticGraph, Sequential => TSequential}
 import com.intel.analytics.bigdl.optim._
 import com.intel.analytics.bigdl.serialization.Bigdl.BigDLModule
+import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
-import com.intel.analytics.bigdl.utils.{Edge, LoggerFilter, Node, Shape}
+import com.intel.analytics.bigdl.utils._
 import com.intel.analytics.bigdl.utils.serializer.{DeserializeContext, ModuleData, ModuleSerializer, SerializeContext}
 import com.intel.analytics.bigdl.visualization.{TrainSummary, ValidationSummary}
 import com.intel.analytics.zoo.pipeline.api.Net
@@ -325,6 +326,24 @@ abstract class KerasNet[T: ClassTag](implicit ev: TensorNumeric[T])
   def summary(
       lineLength: Int = 120,
       positions: Array[Double] = Array(.33, .55, .67, 1)): Unit
+
+  /**
+   * A keras-like API for local prediction.
+   * @param x the input features and the first dim of x should be the number of samples.
+   * @param batch the batch size when executing the inference.
+   */
+  def predict(x: Tensor[T], batch: Int): Tensor[T] = {
+    predict(Array(x), batch)
+  }
+  /**
+   * A keras-like API for local prediction.
+   * The first dim of x should be the number of samples.
+   * @param x if the model accept 2 inputs then the length of the array should be 2.
+   * @param batch the batch size when executing the inference.
+   */
+  def predict(x: Array[Tensor[T]], batch: Int): Tensor[T] = {
+    KerasUtils.predict(this, x, batch)
+  }
 }
 
 class Model[T: ClassTag] private (private val _inputs : Seq[ModuleNode[T]],

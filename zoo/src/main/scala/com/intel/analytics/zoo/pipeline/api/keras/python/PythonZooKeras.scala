@@ -23,7 +23,7 @@ import com.intel.analytics.bigdl.{Criterion, DataSet}
 import com.intel.analytics.bigdl.dataset.{DataSet, LocalDataSet, MiniBatch}
 
 import scala.collection.JavaConverters._
-import com.intel.analytics.bigdl.optim.{OptimMethod, Regularizer, ValidationMethod}
+import com.intel.analytics.bigdl.optim.{LocalPredictor, OptimMethod, Regularizer, ValidationMethod}
 import com.intel.analytics.bigdl.python.api.{EvaluatedResult, JTensor, PythonBigDLKeras, Sample}
 import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
@@ -32,6 +32,7 @@ import com.intel.analytics.bigdl.nn.Container
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity}
 import com.intel.analytics.bigdl.nn.keras.{KerasLayer, KerasModel}
 import com.intel.analytics.bigdl.transform.vision.image.{ImageFeature, ImageFeatureToMiniBatch}
+import com.intel.analytics.bigdl.utils.T
 import com.intel.analytics.zoo.pipeline.api.Net
 import com.intel.analytics.zoo.pipeline.api.autograd._
 import com.intel.analytics.zoo.pipeline.api.keras.layers._
@@ -52,6 +53,16 @@ object PythonZooKeras {
 }
 
 class PythonZooKeras[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonBigDLKeras[T] {
+
+  // the first dim of JTensor for feature should be num of samples
+  def zooPredictLocal(model: AbstractModule[Activity, Activity, T],
+      features: JList[JTensor], batch: Int): JTensor = {
+    val records = features.asScala.toArray.map { f => toTensor(f) }
+    println("2: " + records(0).storage().array()(2))
+    val pred = model.forward(T.array(records)).toTensor
+//    val pred = KerasUtils.predict[T](model, records, batch)
+    toJTensor(pred)
+  }
 
   def createZooKerasModel(
       input: JList[Variable[T]],

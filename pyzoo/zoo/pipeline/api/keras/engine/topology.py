@@ -181,7 +181,24 @@ class KerasNet(ZooKerasLayer):
                              evaluation_data,
                              batch_size)
 
+    def predict_local(self, X, batch=2):
+        """
+        :param X: X can be a ndarray or list of ndarray if the model has multiple inputs.
+                  The first dimension of X should be batch.
+        :return: a ndarray as the prediction result.
+        """
+
+        jresult = callBigDlFunc(self.bigdl_type,
+                             "zooPredictLocal",
+                               self.value,
+                               self._to_jtensors(X),
+                               batch)
+
+        return jresult.to_ndarray()
+
+
     def predict(self, x, distributed=True):
+        return self.forward(x)
         """
         Use a model to do prediction.
 

@@ -193,7 +193,7 @@ object AutoGrad {
     val transposeY = if (axes(1) == 2) {true} else {false}
     val mm = MM[T](transA = transposeX, transB = transposeY)
     val kmm = new KerasLayerWrapper[T](mm.asInstanceOf[AbstractModule[Activity, Activity, T]])
-    kmm.from(x, y)
+    contiguous(kmm.from(x, y))
   }
 }
 

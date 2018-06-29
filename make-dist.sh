@@ -55,7 +55,7 @@ if [ $MVN_INSTALL -eq 0 ]; then
   exit 1
 fi
 
-mvn clean package -DskipTests $*
+mvn  package -DskipTests $*
 
 DIST_DIR=$BASEDIR/dist
 

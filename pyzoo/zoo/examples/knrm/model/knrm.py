@@ -55,17 +55,21 @@ class KNRM(BasicModel):
                 return A.exp(-0.5 * (x - mu) * (x - mu) / sigma / sigma)
 
             return A.Lambda(lambda x: kernel(x))  # Activation(kernel)
-
-        query = Input(name='query', shape=(self.config['text1_maxlen'],))
-        # show_layer_info('Input', query)
-        doc = Input(name='doc', shape=(self.config['text2_maxlen'],))
-        # show_layer_info('Input', doc)
-        embedding = Embedding(self.config['vocab_size'], self.config['embed_size'],
-                               name="query_embedding")  # trainable=self.config['train_embed'] weights=[self.config['embed']]
-        # show_layer_info('Embedding', q_embed)
-        q_embed, d_embed = self.share(embedding, query, doc)
+        query = Input(name='query', shape=[10, 3])
+        doc = Input(name='doc', shape=[10, 3])
+        q_embed = query
+        d_embed = doc
+        # query = Input(name='query', shape=(self.config['text1_maxlen'],))
+        # # show_layer_info('Input', query)
+        # doc = Input(name='doc', shape=(self.config['text2_maxlen'],))
+        # # show_layer_info('Input', doc)
+        # embedding = Embedding(self.config['vocab_size'], self.config['embed_size'],
+        #                        name="query_embedding")  # trainable=self.config['train_embed'] weights=[self.config['embed']]
+        # # show_layer_info('Embedding', q_embed)
+        # q_embed, d_embed = self.share(embedding, query, doc)
         # show_layer_info('Embedding', d_embed)
-        mm = A.dot(q_embed, d_embed, axes=[2, 2], normalize=False)
+        #mm = A.mm(q_embed, d_embed, axes=[2, 2]) #A.dot(q_embed, d_embed, axes=[2, 2], normalize=False)
+        mm = A.mm(q_embed, d_embed, axes=[2, 2])
         # show_layer_info('Dot', mm)
         KM = []
         for i in range(self.config['kernel_num']):
@@ -94,5 +98,5 @@ class KNRM(BasicModel):
         elif self.config['target_mode'] in ['regression', 'ranking']:
             out_ = Dense(1, bias_initializer='zero', name="dense")(Phi)
         # show_layer_info('Dense', out_)
-        model = Model(input=[query, doc], output=[out_])
+        model = Model(input=[query, doc], output=[mm])
         return model

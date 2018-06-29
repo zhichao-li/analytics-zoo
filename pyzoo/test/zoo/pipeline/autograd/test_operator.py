@@ -48,6 +48,8 @@ class TestOperator(ZooTestCase):
         inputs = [Input(s) for s in remove_batch(shape)]
         model = Model(inputs, z_layer(inputs))
         z_output = model.forward([x_value, y_value])
+        z_output2 = model.forward([x_value, y_value])
+
         grad_output = np.array(z_output)
         grad_output.fill(1.0)
         z_grad_y_pred = model.backward(x_value, grad_output)

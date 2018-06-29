@@ -72,5 +72,5 @@ class KNRM2(BasicModel):
             out_ = Dense(1, kernel_initializer=RandomUniform(minval=-0.014, maxval=0.014),
                          bias_initializer='zeros', name="dense")(Phi)
         # show_layer_info('Dense', out_)
-        model = Model(inputs=[query, doc], outputs=[out_])
+        model = Model(inputs=[query, doc], outputs=[mm])
         return model

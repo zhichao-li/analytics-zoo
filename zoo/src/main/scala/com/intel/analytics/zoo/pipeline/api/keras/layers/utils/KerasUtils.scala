@@ -24,7 +24,7 @@ import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity, DataFo
 import com.intel.analytics.bigdl.optim._
 import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
-import com.intel.analytics.bigdl.utils.{MultiShape, Shape, SingleShape}
+import com.intel.analytics.bigdl.utils._
 import com.intel.analytics.zoo.pipeline.api.Net
 import com.intel.analytics.zoo.pipeline.api.keras.metrics.AUC
 import com.intel.analytics.zoo.pipeline.api.keras.models.KerasNet
@@ -33,6 +33,71 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 object KerasUtils {
+
+  // stack on the first dimension
+  def stackTensor[T: ClassTag](
+      tensors: Array[Tensor[T]])(implicit ev: TensorNumeric[T]): Tensor[T] = {
+    val totalSize = tensors.map(_.size().product).sum
+    val mergedStorage = new Array[T](totalSize)
+    var mergedOffSet = 0
+    tensors.map {tensor =>
+      require(tensor.isContiguous(), "The tensor should be contiguous")
+      require(tensor.size().drop(1).deep == tensors.head.size().drop(1).deep,
+        s"The shape of tensor should be the same," +
+          s"but got: ${tensor.size().mkString(",")} " +
+          s"and ${tensors.head.size().drop(1).mkString(",")}")
+      val offset = tensor.storageOffset() - 1
+      System.arraycopy(tensor.storage().array(), offset, mergedStorage, mergedOffSet,
+        tensor.size().product)
+      mergedOffSet += tensor.size().product
+    }
+    println(mergedStorage(3))
+    Tensor[T](shape = Array(tensors.map(_.size(1)).sum) ++ tensors.head.size().drop(1),
+      data = mergedStorage)
+  }
+
+
+  /**
+   * A keras-like API for local prediction.
+   * The first dim of x should be the number of samples.
+   * @param x if the model accept 2 inputs then the length of the array should be 2.
+   * @param batch the batch size when executing the inference.
+   */
+  def predict[T: ClassTag](module: AbstractModule[Activity, Activity, T],
+      x: Array[Tensor[T]], batch: Int)(implicit ev: TensorNumeric[T]): Tensor[T] = {
+    val preds = KerasUtils.predictMultiOut[T](module, x, batch)
+    println("yuiyui")
+    KerasUtils.stackTensor[T](preds.map(_.toTensor))
+  }
+
+  def predictMultiOut[T: ClassTag](module: AbstractModule[Activity, Activity, T],
+      x: Array[Tensor[T]], batch: Int)(implicit ev: TensorNumeric[T]): Array[Activity] = {
+    val splitedFeatures = x.map(_.split(size = batch, dim = 1))
+    var j = 0
+    val inputs = ArrayBuffer[Array[Tensor[T]]]()
+    while(j < splitedFeatures(0).length) {
+      inputs.append(Range(0, x.length).map(recordId => splitedFeatures(recordId)(j)).toArray)
+      j += 1
+    }
+    val modelInputs = inputs.map { features =>
+      if (features.length == 1) {
+        features(0).asInstanceOf[Activity]
+      } else {
+        T.array(features).asInstanceOf[Activity]
+      }
+    }
+    val preds = modelInputs.map { input =>
+      val pred = module.forward(input)
+      if (pred.isInstanceOf[Table]) {
+        T.array(pred.toTable.toTable.toSeq[Tensor[T]].map(_.clone()).toArray)
+      } else if (pred.isInstanceOf[Tensor[T]]) {
+        pred.toTensor.clone().asInstanceOf[Activity]
+      } else {
+        throw new IllegalArgumentException(s"Not supported type: ${pred.getClass}")
+      }
+    }
+    preds.toArray
+  }
 
   def getPadsFromBorderMode(borderMode: String = "valid"): (Int, Int) = {
     if (borderMode == "same") {

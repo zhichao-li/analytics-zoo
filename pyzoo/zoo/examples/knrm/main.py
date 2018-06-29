@@ -136,8 +136,8 @@ def set_weights_per_layer(kmodel, zmodel, layer_name):
 
 def generate_dummy(batch_size):
     batch_size = batch_size
-    query_data = np.random.randint(0, 10000, [batch_size, 10])
-    doc_data = np.random.randint(0, 10000, [batch_size, 40])
+    query_data = np.random.randint(0, 10000, [batch_size, 10, 3])
+    doc_data = np.random.randint(0, 10000, [batch_size, 10, 3])
     return [query_data, doc_data]
 
 def predict(config, input_data, batch_size):
@@ -146,14 +146,29 @@ def predict(config, input_data, batch_size):
     # model.load_weights(weights_file)
     kmodel = load_model(config, keras_KNRM)
 
-    ######## Get and Set Weights ########
-    set_weights_per_layer(kmodel, model, "query_embedding")
-    set_weights_per_layer(kmodel, model, "dense")
+    # ######## Get and Set Weights ########
+    # set_weights_per_layer(kmodel, model, "query_embedding")
+    # # set_weights_per_layer(kmodel, model, "dense")
+    #
+    # model2 = load_model(config, zoo_KNRM)
+    # set_weights_per_layer(kmodel, model2, "query_embedding")
 
-    keras2_y_pred = kmodel.predict(input_data, batch_size=batch_size)
-    y_pred = model.forward(input_data)
-    # y_pred = model.predict(input_data, distributed=False)
-    equal = np.allclose(y_pred, keras2_y_pred, rtol=1e-5, atol=1e-5)
+    # keras2_y_pred = kmodel.predict(input_data, batch_size=batch_size)
+    # keras2_y_pred2 = kmodel.predict(input_data, batch_size=batch_size)
+    numpy.random.seed(49999)
+    in1 = generate_dummy(batch_size)
+    # in2 = [i.copy() for i in in1]
+    # model.save_graph_topology("/tmp/hello")
+    y_pred = model.forward(in1)
+    # model.save_graph_topology("/tmp/hello")
+    y_pred2 = model.forward(in1)
+
+    # y_pred = model.predict(in1,  distributed=False)
+    # y_pred2 = model.predict(in2, distributed=False)
+    assert(np.allclose(y_pred, y_pred2, rtol=1e-5, atol=1e-5))
+    # model.save("/tmp/knrm.model")
+    # y_pred = model.forward(input_data)
+    # equal = np.allclose(y_pred, keras2_y_pred, rtol=1e-5, atol=1e-5)
     print(equal)
     return y_pred
 
@@ -168,7 +183,7 @@ def main(argv):
     if args.phase == 'train':
         train(config)
     elif args.phase == 'predict':
-        batch_size = 200
+        batch_size = 32
         predict(config, generate_dummy(batch_size), batch_size)
     else:
         print('Phase Error.', end='\n')

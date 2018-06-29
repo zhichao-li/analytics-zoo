@@ -17,13 +17,13 @@
 package com.intel.analytics.zoo.pipeline.api
 
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity}
-import com.intel.analytics.bigdl.nn.{CAddTable, SpatialCrossMapLRN}
+import com.intel.analytics.bigdl.nn.{CAddTable, MM, SpatialCrossMapLRN, Sum}
 import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.utils.{Shape, T}
 import com.intel.analytics.zoo.pipeline.api.autograd.Variable
 import com.intel.analytics.zoo.pipeline.api.keras.ZooSpecHelper
 import com.intel.analytics.zoo.pipeline.api.keras.layers.utils.KerasUtils
-import com.intel.analytics.zoo.pipeline.api.keras.layers.{Dense, Input, KerasLayerWrapper}
+import com.intel.analytics.zoo.pipeline.api.keras.layers._
 import com.intel.analytics.zoo.pipeline.api.keras.models.{KerasNet, Model => ZModel}
 
 class NetSpec extends ZooSpecHelper{
@@ -131,5 +131,62 @@ class NetSpec extends ZooSpecHelper{
     val model = Net.loadTF[Float](resource.getPath)
     val result = model.forward(Tensor[Float](4, 1, 28, 28).rand())
     result.toTensor[Float].size() should be (Array(4, 10))
+  }
+
+  "keras-like predict local multiple input" should "work properly" in {
+    val input1 = Input[Float](inputShape = Shape(3))
+    val input2 = Input[Float](inputShape = Shape(2))
+    val out = Merge.merge(List(input1, input2), mode = "concat")
+    val model = ZModel[Float](input = Array(input1, input2), output = out)
+    val recordNum = 113
+    val inputData = Array(Tensor[Float](recordNum, 3).rand(), Tensor[Float](recordNum, 2).rand())
+    val result = model.predict(inputData, batch = 4)
+    val fResult = model.forward(T.array(inputData))
+    assert(result.almostEqual(fResult.toTensor[Float], 1e-5))
+  }
+
+  "keras-like predict local single output" should "work properly" in {
+//    val input1 = Input[Float](inputShape = Shape(3))
+//    val out = Dense[Float](4).inputs(input1)
+//    val model = ZModel[Float](input = input1, output = out)
+//    val recordNum = 113
+//    val inputData = Tensor[Float](recordNum, 3).rand()
+//    val result = model.predict(inputData, batch = 4)
+//    val fResult = model.forward(inputData)
+//    assert(result.almostEqual(fResult.toTensor[Float], 1e-5))
+//    val i = Tensor[Float](recordNum, 2, 3).rand()
+//    val i2 = Tensor[Float](recordNum, 2, 3).rand()
+//    val mm = MM[Float](transB = true)
+//    val o1 = mm.forward(T(i, i2))
+//    mm.forward(T(i, i2))
+//    mm.forward(T(i, i2))
+//    mm.forward(T(i, i2))
+//    val o2 = mm.forward(T(i, i2))
+//    assert(o1.almostEqual(o2, 1e-5))
+
+//    val sum = Sum[Float]()
+//        val o1 = sum.forward(i)
+//        val o2 = sum.forward(i)
+//        assert(o1.almostEqual(o2, 1e-5))
+//    import com.intel.analytics.zoo.pipeline.api.autograd.AutoGrad
+//    val input1 = Variable[Float](inputShape = Shape(4, 2))
+//    val input2 = Variable[Float](inputShape = Shape(4, 2))
+//    val embedding1 = Embedding[Float](10, 20)
+//    val embedding2 = Embedding[Float](10, 20)
+//    val query = embedding1.from(input1)
+//    val doc = embedding2.from(input2)
+//    AutoGrad.dot(query, doc, axes = List(2, 2))
+
+        import com.intel.analytics.zoo.pipeline.api.autograd.AutoGrad
+        val input1 = Variable[Float](inputShape = Shape(4, 2))
+        val input2 = Variable[Float](inputShape = Shape(4, 2))
+        val result = AutoGrad.mm(input1, input2, axes = List(2, 2))
+        val model = ZModel[Float](input = Array(input1, input2), output = result)
+    val recordNum = 2
+        val i1 = Tensor[Float](recordNum, 3, 4).rand()
+        val i2 = Tensor[Float](recordNum, 3, 4).rand()
+    val o1 = model.forward(T(i1, i2)).toTensor[Float].clone()
+    val o2 = model.forward(T(i1, i2)).toTensor[Float].clone()
+    assert(o1.almostEqual(o2, 1e-5))
   }
 }

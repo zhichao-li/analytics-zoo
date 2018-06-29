@@ -63,7 +63,7 @@ def dot(x, y, axes=1, normalize=False):
         if len(x.get_output_shape()) == 2 :  # pure dot product
             return sum(x * y, axis=1, keepDims=True)
         elif len(x.get_output_shape()) == 3:
-            return mm(x, y, axes=axes)
+            return contiguous(mm(x, y, axes=axes))
         else:
             raise Exception("Only support 2D and 3D for now, but got" + x.get_output_shape())
 
@@ -134,7 +134,7 @@ def contiguous(x):
     Turn the output and grad to be contiguous for the input Variable
     :param x: A variable.
     """
-    return Variable.from_jvalue(callBigDlFunc("float", "softplus", x))
+    return Variable.from_jvalue(callBigDlFunc("float", "contiguous", x))
 
 
 def square(x):
