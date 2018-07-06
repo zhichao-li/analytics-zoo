@@ -15,7 +15,7 @@ import scala.collection.JavaConverters._
 object HDF5Reader {
 
   def main(args: Array[String]) {
-    HDF5Reader("/tmp/")
+//    HDF5Reader("/tmp/")
   }
 }
 
