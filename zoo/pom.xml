@@ -25,6 +25,9 @@
         <scalatest.version>2.2.4</scalatest.version>
         <spark.version>2.1.0</spark.version>
         <bigdl.version>0.5.0</bigdl.version>
+        <javacpp.version>1.4.2-SNAPSHOT</javacpp.version>
+        <javacpp-presets.version>1.4.2-SNAPSHOT</javacpp-presets.version>
+        <hdf5.version>1.10.2</hdf5.version>
     </properties>
 
     <distributionManagement>
@@ -245,6 +248,26 @@
             <artifactId>tensorflow</artifactId>
             <version>1.8.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacpp</artifactId>
+            <version>${javacpp.version}</version>
+        </dependency>
+
+        <!--<dependency>-->
+            <!--<groupId>org.bytedeco.javacpp-presets</groupId>-->
+            <!--<artifactId>hdf5-platform</artifactId>-->
+            <!--<version>${hdf5.version}-${javacpp-presets.version}</version>-->
+        <!--</dependency>-->
+
+        <!-- https://mvnrepository.com/artifact/org.bytedeco.javacpp-presets/hdf5-platform -->
+        <dependency>
+            <groupId>org.bytedeco.javacpp-presets</groupId>
+            <artifactId>hdf5-platform</artifactId>
+            <version>1.10.1-1.4.1</version>
+        </dependency>
+
     </dependencies>
 
     <build>
