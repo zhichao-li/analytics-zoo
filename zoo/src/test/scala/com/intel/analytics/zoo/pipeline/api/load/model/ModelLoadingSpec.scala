@@ -31,6 +31,7 @@ class ModelLoadingSpec extends KerasBaseSpec {
   "Read hdf5" should "be ok" taggedAs(Keras2Test) in {
     val hdf5Reader = new HDF5Reader("/home/lizhichao/bin/god/zoo/seq.h5")
     val modelConfig = hdf5Reader.readAttributeAsFixedLengthString("model_config", 100)
+    val dataVaule = hdf5Reader.readDataSet("kernel:0", Array("model_weights", "dense_1", "dense_1"))
     println(modelConfig)
 
   }
