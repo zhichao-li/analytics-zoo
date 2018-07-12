@@ -39,18 +39,18 @@ abstract class KerasBaseSpec extends ZooSpecHelper {
   }
 
   private def defaultWeightConverter(in: Array[Tensor[Float]]) = in
-
   // weightConverter: convert keras weight to BigDL format,
   // do nothing for the default converter
   def checkOutputAndGrad(bmodel: AbstractModule[Tensor[Float], Tensor[Float], Float],
                          kerasCode: String,
                          weightConverter: (Array[Tensor[Float]]) => Array[Tensor[Float]]
                          = defaultWeightConverter,
-                         precision: Double = 1e-5): Unit = {
+                         precision: Double = 1e-5,
+                         resetWeights: Boolean = true): Unit = {
     ifskipTest()
     val (gradInput, gradWeight, weights, input, target, output) = KerasRunner.run(kerasCode)
     // Ensure they share the same weights
-    if (weights != null) {
+    if (weights != null && resetWeights) {
       bmodel.setWeightsBias(weightConverter(weights))
     }
 
@@ -87,5 +87,3 @@ abstract class KerasBaseSpec extends ZooSpecHelper {
     bgradInput.almostEqual(kgradInput, precision) should be(true)
   }
 }
-
-abstract class Keras2BaseSpec extends KerasBaseSpec

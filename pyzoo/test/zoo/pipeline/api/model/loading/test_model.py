@@ -28,15 +28,19 @@ np.random.seed(1337)  # for reproducibility
 class TestModelLoading(ZooTestCase):
 
     def test_create_model(self):
-        from keras.models import *
-        from keras.layers import *
+        from keras.models import Sequential
+        from keras.layers import Dense
         model = Sequential()
         model.add(Dense(10, kernel_initializer="glorot_uniform", input_shape=(8, )))
+        ss = Sequential()
+        ss.add(Dense(11, input_shape=(10, )))
+        ss.add(Dense(14))
+        model.add(ss)
         model.add(Dense(12))
+
         from keras.models import load_model
         model.save('/tmp/seq.h5')  # creates a HDF5 file 'my_model.h5'
-
-
+        load_model('/tmp/seq.h5')
 
 if __name__ == "__main__":
     pytest.main([__file__])

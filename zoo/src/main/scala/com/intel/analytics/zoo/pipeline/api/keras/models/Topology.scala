@@ -53,6 +53,9 @@ abstract class KerasNet[T: ClassTag](implicit ev: TensorNumeric[T])
     this.labor.asInstanceOf[Container[Activity, Activity, T]].modules.toList
   }
 
+  // Not a flatten version
+  def layers(): List[AbstractModule[Activity, Activity, T]] = getSubModules()
+
   private var optimMethod: OptimMethod[T] = null
   private var criterion: Criterion[T] = null
   private var vMethods: Array[ValidationMethod[T]] = null

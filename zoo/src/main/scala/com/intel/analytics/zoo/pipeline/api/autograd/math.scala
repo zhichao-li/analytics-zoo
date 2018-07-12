@@ -353,7 +353,7 @@ class Variable[T: ClassTag] private[zoo] (val node: ModuleNode[T], var name: Str
 
 
   private[zoo] def toGraph(inputs: Array[Variable[T]]): Model[T] = {
-    Model(input = inputs.map(_.node), output = this.node)
+    Model(input = inputs.map(_.node).filter(this.getRoots().contains(_)), output = this.node)
   }
 
   // "tensorboard --logdir path" to visualize this Variable

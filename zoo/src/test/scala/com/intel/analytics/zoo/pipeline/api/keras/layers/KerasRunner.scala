@@ -64,10 +64,10 @@ object KerasRunner {
       |Y = []
       |output = model.predict(input)
       |
-      |grad_input = K.get_session().run(K.gradients(model.output * output, model.input), feed_dict={input_tensor: input}) # grad_input
+      |grad_input = K.get_session().run(K.gradients(model.output * output, model.input), feed_dict={model.input: input}) # grad_input
       |
       |grad_weight = K.get_session().run(K.gradients(model.output * output, model.trainable_weights),  # grad_weight
-      |                        feed_dict={input_tensor: input})
+      |                        feed_dict={model.input: input})
       |weights = model.get_weights()
 
       """.stripMargin

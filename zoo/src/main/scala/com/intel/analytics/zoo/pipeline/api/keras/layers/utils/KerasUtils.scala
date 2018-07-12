@@ -16,6 +16,8 @@
 
 package com.intel.analytics.zoo.pipeline.api.keras.layers.utils
 
+import java.lang.reflect.Method
+
 import com.intel.analytics.bigdl.Criterion
 import com.intel.analytics.bigdl.nn.Graph.ModuleNode
 import com.intel.analytics.bigdl.nn._
@@ -230,17 +232,21 @@ object KerasUtils {
 
   private[zoo] def invokeMethod(obj: Object, methodName: String, args: Object*): Object = {
     val clazz = obj.getClass()
-    val method =
-      try {
+    val method = findMethod(clazz, methodName, args)
+    method.invoke(obj, args: _*)
+  }
+
+  private[zoo] def findMethod(clazz: Class[_],
+      methodName: String, args: Object*): Method = {
+    try {
       clazz.getMethod(methodName, args.map(_.getClass): _*)
     } catch {
-        case t: Throwable =>
-          val methods = clazz.getMethods().filter(_.getName() == methodName)
-          require(methods.length == 1,
-            s"We should only found one result, but got ${methodName}: ${methods.length}")
-          methods(0)
+      case t: Throwable =>
+        val methods = clazz.getMethods().filter(_.getName() == methodName)
+        require(methods.length == 1,
+          s"We should only found one result, but got ${methodName}: ${methods.length}")
+        methods(0)
     }
-    method.invoke(obj, args: _*)
   }
 
   /**
