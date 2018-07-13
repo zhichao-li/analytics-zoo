@@ -39,8 +39,32 @@ object Utils {
      result.toArray
    }
 
+  def toInboundNodes(jsonConfig: JsonNode): Array[(String, Int, Int)] = {
+    if (jsonConfig.get("inbound_nodes") == null) {
+      return Array[(String, Int, Int)]()
+    }
+    val iter = jsonConfig.get("inbound_nodes").iterator()
+    val result = ArrayBuffer[(String, Int, Int)]()
+    while(iter.hasNext) {
+      val node = iter.next()
+      val tensors = node.iterator()
+      var i = 0
+      while(tensors.hasNext) {
+        i += 1
+        val tensor = tensors.next()
+        val layerName = tensor.get(0).asText()
+        val outIndex = tensor.get(1).asInt()
+        val outTensorIndex = tensor.get(2).asInt()
+        result.append((layerName, outIndex, outTensorIndex))
+      }
+      // TODO: still no idea why there's an array here.
+      require(i == 1, s"the items within node should be 1, but got: ${i}")
+    }
+    result.toArray
+  }
+
   def getInputShape(json: JsonNode): Shape = {
-    if (json == null) {
+    if (json == null || json.get("batch_input_shape") == null) {
       null
     } else {
       val batchShape = toArrayInt(json.get("batch_input_shape"))

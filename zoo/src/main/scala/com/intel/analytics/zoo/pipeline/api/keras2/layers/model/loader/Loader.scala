@@ -35,8 +35,6 @@ trait Loader {
 
 trait LayerLoader extends Loader {
   def toZooFormat(kerasWeights: Array[Tensor[Float]]): Array[Tensor[Float]]
-
-  def getWeightsFromH5(h5File: HDF5Reader, layerName: String): Array[Tensor[Float]]
 }
 
 object ModelLoader extends Loader {
@@ -111,20 +109,5 @@ object LayerLoader extends Loader {
       kerasWeights)
     method.invoke(cls,
       kerasWeights).asInstanceOf[Array[Tensor[Float]]]
-  }
-
-  def setWeights(module: KerasLayer[Activity, Activity, Float], hDF5File: String): Unit = {
-    val hDF5Reader = HDF5Reader(hDF5File)
-    val name = module.getName()
-    val className = module.getClass.getSimpleName
-    val cls = getClazz(className)
-    val method = KerasUtils.findMethod(cls,
-      "getWeightsFromH5",
-      hDF5Reader,
-      name)
-    val weights = method.invoke(cls,
-      hDF5Reader,
-      name).asInstanceOf[Array[Tensor[Float]]]
-    module.setWeightsBias(weights)
   }
 }

@@ -26,14 +26,8 @@ import com.intel.analytics.zoo.pipeline.api.keras.models.Sequential
 import com.intel.analytics.zoo.pipeline.api.keras2.layers.Keras2ModelLoadingBaseSpec
 import com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.{LayerLoader, ModelLoader}
 
-class SequentialSpec extends Keras2ModelLoadingBaseSpec {
+class SequentialLoaderSpec extends Keras2ModelLoadingBaseSpec {
   "Sequential" should "be the same as Keras" in {
-
-//    val str = "dense_1/kernel:0dense_1/bias:0"
-//
-//    val attributeMatcher = Pattern.compile(":\\d+").matcher(str);
-//    val foundTfGroups = attributeMatcher.find();
-//    foundTfGroups
     val modelPath = randomModelPath()
     val kerasCode =
       s"""

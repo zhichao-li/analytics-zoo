@@ -22,7 +22,7 @@ import com.intel.analytics.bigdl.utils.Shape
 import com.intel.analytics.zoo.pipeline.api.keras.layers.{InputLayer, KerasRunner}
 import com.intel.analytics.zoo.pipeline.api.keras.models.Sequential
 import com.intel.analytics.zoo.pipeline.api.keras2.layers.Keras2ModelLoadingBaseSpec
-import com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.LayerLoader
+import com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.{LayerLoader, ModelLoader}
 
 class DenseLoaderSpec extends Keras2ModelLoadingBaseSpec {
   "Dense" should "be the same as Keras" in {
@@ -37,13 +37,8 @@ class DenseLoaderSpec extends Keras2ModelLoadingBaseSpec {
         |model.save("${modelPath}")
       """.stripMargin
     KerasRunner.run(kerasCode)
-    val seq = Sequential[Float]()
-    val input = InputLayer[Float](inputShape = Shape(3), name = "input1")
-    seq.add(input)
-    val dense = reloadOutputLayerForModel(modelPath)
-    seq.add(dense)
-    LayerLoader.setWeights(dense, modelPath)
-    checkOutputAndGrad(seq.asInstanceOf[AbstractModule[Tensor[Float], Tensor[Float], Float]],
+    val reloadedModel = ModelLoader.load(modelPath)
+    checkOutputAndGrad(reloadedModel.asInstanceOf[AbstractModule[Tensor[Float], Tensor[Float], Float]],
       kerasCode, weightConverter = DenseLoader.toZooFormat, resetWeights = false)
   }
 }

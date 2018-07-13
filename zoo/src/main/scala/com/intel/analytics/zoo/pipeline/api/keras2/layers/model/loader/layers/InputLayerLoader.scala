@@ -19,30 +19,21 @@ package com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.layers
 import com.fasterxml.jackson.databind.JsonNode
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity}
 import com.intel.analytics.bigdl.tensor.Tensor
-import com.intel.analytics.zoo.pipeline.api.keras2.layers.Dense
-import com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.{HDF5Reader, LayerLoader, Loader, Utils}
+import com.intel.analytics.zoo.pipeline.api.keras.layers.InputLayer
+import com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.{LayerLoader, Utils}
 
-object DenseLoader extends LayerLoader {
+object InputLayerLoader extends LayerLoader {
 
   override def toZooFormat(kerasWeights: Array[Tensor[Float]]): Array[Tensor[Float]] = {
-    Array(kerasWeights(0).t(), kerasWeights(1))
+    throw new RuntimeException("Invalid operation")
   }
 
   override def fromConfig(layerLevelConfig: JsonNode): AbstractModule[Activity, Activity, Float] = {
     val config = layerLevelConfig.get("config")
-    val units = config.get("units").asInt()
-    val activation = config.get("activation").asText()
-    val useBias = config.get("use_bias").asBoolean()
-    //      val kernelInitializer = config.get("kernel_initializer")
-    //      val biasInitializer = config.get("bias_initializer")
-    //      val kernelRegularizer = config.get("kernel_regularizer")
-    //      val biasRegularizer = config.get("bias_regularizer")
-    //
     val inputShape = Utils.getInputShape(config)
     val name = config.get("name").asText()
-    val module = Dense[Float](units = units,
-      activation = activation,
-      useBias = useBias,
+
+    val module = InputLayer[Float](
       inputShape = inputShape).asInstanceOf[AbstractModule[Activity, Activity, Float]]
     module.setName(name)
     module

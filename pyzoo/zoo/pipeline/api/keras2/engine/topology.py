@@ -18,3 +18,9 @@ import sys
 if sys.version >= '3':
     long = int
     unicode = str
+
+import zoo.pipeline.api.keras as keras1
+
+class Sequential(keras1.Sequential):
+    def fit(self):
+        super().fit
