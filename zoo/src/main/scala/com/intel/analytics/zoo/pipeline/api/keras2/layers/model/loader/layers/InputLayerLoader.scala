@@ -28,14 +28,11 @@ object InputLayerLoader extends LayerLoader {
     throw new RuntimeException("Invalid operation")
   }
 
-  override def fromConfig(layerLevelConfig: JsonNode): AbstractModule[Activity, Activity, Float] = {
+  def doFromConfig(layerLevelConfig: JsonNode): AbstractModule[Activity, Activity, Float] = {
     val config = layerLevelConfig.get("config")
     val inputShape = Utils.getInputShape(config)
-    val name = config.get("name").asText()
-
     val module = InputLayer[Float](
       inputShape = inputShape).asInstanceOf[AbstractModule[Activity, Activity, Float]]
-    module.setName(name)
     module
   }
 }

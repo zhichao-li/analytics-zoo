@@ -12,23 +12,13 @@ import scala.collection.mutable.ArrayBuffer
 
 
 trait Loader {
-  def fromConfig(config: JsonNode): AbstractModule[Activity, Activity, Float] = {
-    throw new RuntimeException("Haven't been implemented yet")
-  }
+  def doFromConfig(config: JsonNode): AbstractModule[Activity, Activity, Float]
 
-  def getClazz(className: String): Class[LayerLoader] = {
-    Class.forName(
-      s"com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.layers.${className}Loader")
-      .asInstanceOf[Class[LayerLoader]]
-  }
-
-  final def load(layerLevelConfig: JsonNode): KerasLayer[Activity, Activity, Float] = {
-    val className = layerLevelConfig.get("class_name").asText()
-    val cls = getClazz(className)
-    val method = KerasUtils.findMethod(cls,
-      "fromConfig",
-      layerLevelConfig)
-    val module = method.invoke(cls, layerLevelConfig).asInstanceOf[KerasLayer[Activity, Activity, Float]]
+  final def fromConfig(layerLevelConfig: JsonNode): AbstractModule[Activity, Activity, Float] = {
+    val config = layerLevelConfig.get("config")
+    val name = config.get("name").asText()
+    val module = doFromConfig(layerLevelConfig)
+    module.setName(name)
     module
   }
 }
@@ -37,23 +27,38 @@ trait LayerLoader extends Loader {
   def toZooFormat(kerasWeights: Array[Tensor[Float]]): Array[Tensor[Float]]
 }
 
-object ModelLoader extends Loader {
-  override def getClazz(className: String): Class[LayerLoader] = {
+object Loader {
+  def getClazz(packagePath: String, className: String): Class[_] = {
     Class.forName(
-      s"com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.model.${className}Loader")
-      .asInstanceOf[Class[LayerLoader]]
+      s"${packagePath}.${className}Loader")
   }
+  def load(layerLevelConfig: JsonNode, packagePath: String):
+  KerasLayer[Activity, Activity, Float] = {
+    val className = layerLevelConfig.get("class_name").asText()
+    val cls = getClazz(packagePath, className)
+      .asInstanceOf[Class[LayerLoader]]
+    val method = KerasUtils.findMethod(cls,
+      "fromConfig",
+      layerLevelConfig)
+    val module =
+      method.invoke(cls, layerLevelConfig).asInstanceOf[KerasLayer[Activity, Activity, Float]]
+    module
+  }
+}
+
+object ModelLoader {
+  private val packagePath = "com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.model"
 
   def load(h5Path: String, resetWeights: Boolean = true): KerasNet[Float] = {
     val hDF5Reader = HDF5Reader(h5Path)
     val modelConfig = hDF5Reader.readAttribute("model_config")
     val config = Utils.toJson(modelConfig)
-    val model = load(config).asInstanceOf[KerasNet[Float]]
+    val model = Loader.load(config, packagePath).asInstanceOf[KerasNet[Float]]
     loadWeightsFromH5(hDF5Reader, model)
     model
   }
 
-  def processWeightString(str: String): Array[String] = {
+  private def processWeightString(str: String): Array[String] = {
     val prefixes = str.split(":\\d+").filter(!_.isEmpty)
     val weightSurfix = prefixes.map {prefix =>
       (prefix + ":\\d+").r.findFirstIn(str).get
@@ -61,7 +66,6 @@ object ModelLoader extends Loader {
     weightSurfix
   }
 
-  // layers may containing
   def loadWeightsFromH5(hDF5Reader: HDF5Reader,
       model: KerasNet[Float]): Unit = {
     val layers: List[AbstractModule[Activity, Activity, Float]] = model.layers()
@@ -94,16 +98,15 @@ object ModelLoader extends Loader {
           zlayer.setWeightsBias(zWeights)
         }
       }
-
     }
-
   }
 }
 
-object LayerLoader extends Loader {
+object LayerLoader {
+  private val packagePath = "com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.layers"
 
   def toZooFormat(className: String, kerasWeights: Array[Tensor[Float]]): Array[Tensor[Float]] = {
-    val cls = getClazz(className)
+    val cls = Loader.getClazz(this.packagePath, className)
     val method = KerasUtils.findMethod(cls,
       "toZooFormat",
       kerasWeights)

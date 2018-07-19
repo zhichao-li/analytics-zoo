@@ -18,11 +18,9 @@ package com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.layers
 
 import com.intel.analytics.bigdl.nn.abstractnn.AbstractModule
 import com.intel.analytics.bigdl.tensor.Tensor
-import com.intel.analytics.bigdl.utils.Shape
-import com.intel.analytics.zoo.pipeline.api.keras.layers.{InputLayer, KerasRunner}
-import com.intel.analytics.zoo.pipeline.api.keras.models.Sequential
+import com.intel.analytics.zoo.pipeline.api.keras.layers.KerasRunner
 import com.intel.analytics.zoo.pipeline.api.keras2.layers.Keras2ModelLoadingBaseSpec
-import com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.{LayerLoader, ModelLoader}
+import com.intel.analytics.zoo.pipeline.api.keras2.layers.model.loader.ModelLoader
 
 class DenseLoaderSpec extends Keras2ModelLoadingBaseSpec {
   "Dense" should "be the same as Keras" in {

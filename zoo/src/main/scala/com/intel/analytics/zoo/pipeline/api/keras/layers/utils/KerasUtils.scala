@@ -57,6 +57,12 @@ object KerasUtils {
     }
   }
 
+  def getRegularizer[T: ClassTag](reg: String): Regularizer[T] = {
+    reg.toLowerCase() match {
+
+    }
+  }
+
   def getKerasActivation[T : ClassTag] (activation: String)
     (implicit ev: TensorNumeric[T]): KerasLayer[Tensor[T], Tensor[T], T] = {
     if (activation == null) { return null }
