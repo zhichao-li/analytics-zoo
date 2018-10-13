@@ -17,14 +17,19 @@
 package com.intel.analytics.zoo.feature.image
 
 import com.intel.analytics.bigdl.DataSet
-import com.intel.analytics.bigdl.dataset.DataSet
+import com.intel.analytics.bigdl.dataset.{CachedDistriDataSet, DataSet, DistributedDataSet, Sample}
+import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.transform.vision.image.{DistributedImageFrame, ImageFeature, ImageFrame, LocalImageFrame}
+import com.intel.analytics.bigdl.utils.Engine
 import com.intel.analytics.zoo.common.Utils
 import com.intel.analytics.zoo.feature.common.Preprocessing
+import com.intel.analytics.zoo.pipeline.api.keras.layers.utils.EngineRef
 import org.apache.commons.io.FileUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.opencv.imgcodecs.Imgcodecs
+
+import scala.reflect.ClassTag
 
 /**
  * ImageSet wraps a set of ImageFeature
@@ -74,7 +79,7 @@ abstract class ImageSet {
   /**
    * Convert ImageSet to DataSet of ImageFeature.
    */
-  def toDataSet(): DataSet[ImageFeature]
+  def toDataSet(enableAEP: Boolean = false): DataSet[ImageFeature]
 }
 
 class LocalImageSet(var array: Array[ImageFeature]) extends ImageSet {
@@ -110,8 +115,30 @@ class DistributedImageSet(var rdd: RDD[ImageFeature]) extends ImageSet {
     ImageFrame.rdd(rdd)
   }
 
-  override def toDataSet(): DataSet[ImageFeature] = {
-    DataSet.rdd[ImageFeature](rdd)
+  override def toDataSet(enableAEP: Boolean = false): DataSet[ImageFeature] = {
+    if (!enableAEP) {
+      DataSet.rdd[ImageFeature](rdd)
+    } else {
+
+    }
+
+  }
+
+  private def aepCachedRdd(data: RDD[Tensor[Float]]): DistributedDataSet[Tensor[Float]] = {
+    val nodeNumber = EngineRef.getNodeNumber()
+    val newRdd = data.coalesce(nodeNumber, true)
+      .mapPartitions(iter => {
+        Iterator.single(iter.toArray)
+      }).setName("cached dataset")
+    newRdd.mapPartitions {iter =>
+      iter.map { item =>
+        AEPDataHolder(item)s
+      }
+
+    }
+
+
+    new CachedDistriDataSet[Tensor[Float]](newRdd)
   }
 }
 
