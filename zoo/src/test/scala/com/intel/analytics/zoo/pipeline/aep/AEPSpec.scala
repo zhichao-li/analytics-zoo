@@ -16,11 +16,33 @@
 
 package com.intel.analytics.zoo.pipeline.aep
 
-import com.intel.analytics.zoo.aep.AEPSimulator
+import com.intel.analytics.zoo.aep.{AEPFloatArray, AEPHandler}
 import com.intel.analytics.zoo.pipeline.api.keras.ZooSpecHelper
 
 class AEPSpec extends ZooSpecHelper {
   "load native lib" should "be ok" in {
-    val aep = new AEPSimulator()
+    val address = AEPHandler.allocate(1000L)
+    AEPHandler.free(address)
+  }
+
+  "AEPFloatArray" should "be ok" in {
+    val address = AEPHandler.allocate(1000)
+    AEPHandler.free(address)
+    val array = Array[Float](1.2f, 0.3f, 4.5f, 199999.6f)
+    val aepArray = AEPFloatArray(array.toIterator, array.size)
+    var i = 0
+    while( i < aepArray.size) {
+      assert(aepArray.get(i) == array(i))
+      i += 1
+    }
+  }
+
+  "AEPBytesArray" should "be ok" in {
+    val aepArray = new AEPBytesArray(array.toIterator, array.size)
+    var i = 0
+    while( i < aepArray.size) {
+      assert(aepArray.get(i) == array(i))
+      i += 1
+    }
   }
 }

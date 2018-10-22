@@ -2,8 +2,8 @@ CC       = g++
 SUFFIX  ?= so
 
 TARGET_DIR=./target
-LIB  = $(TARGET_DIR)/libape.$(SUFFIX)
-SOURCES=./com_intel_analytics_zoo_aep_AEPSimulator.cpp
+LIB  = $(TARGET_DIR)/libaep.$(SUFFIX)
+SOURCES=./com_intel_analytics_zoo_aep_AEPHandler.cpp
 OBJECTS=$(TARGET_DIR)/aep.o
 
 all: $(LIB)
@@ -16,4 +16,4 @@ $(OBJECTS): $(SOURCES)
 		$(CC) -c -I ${JAVA_HOME}/include -I ${JAVA_HOME}/include/linux -fPIC $< -o $@
 
 clean:
-		rm -rf $(OBJECTS) $(EXECUTABLE)
+		rm -rf $(OBJECTS) $(LIB)

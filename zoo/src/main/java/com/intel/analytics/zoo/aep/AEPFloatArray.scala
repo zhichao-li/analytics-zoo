@@ -3,57 +3,45 @@ package com.intel.analytics.zoo.aep
 
 import org.apache.spark.unsafe.Platform
 
+object AEPFloatArray {
+
+  def getTotalBytes(size: Long): Long = {
+    size * 4
+  }
+  val MOVE_STEPS = 4
+
+  def apply(size: Long): AEPFloatArray = {
+    val startAddr: Long = Platform.allocateMemory(AEPFloatArray.getTotalBytes(size))
+    assert(startAddr > 0, "Not enough memory!")
+    new AEPFloatArray(startAddr, size)
+  }
+
+  def apply(iterator: Iterator[Float], size: Long): AEPFloatArray = {
+    val aepArray = AEPFloatArray(size)
+    var i = 0
+    while(iterator.hasNext) {
+      aepArray.set(i, iterator.next())
+      i += 1
+    }
+    aepArray
+  }
+}
 /**
   * An float array with fixed size stored in AEP.
  *  @param startAddr the start address of the array
   * @param size the size of the array
   */
-class AEPFloatArray(val startAddr: Long, val size: Long) {
+class AEPFloatArray(val startAddr: Long, val size: Long) extends AEPArray[Float](startAddr, size) {
 
-  def AEPFloatArray(size: Long) {
-    val startAddr: Long = Platform.allocateMemory(totalBytes)
-    assert(startAddr > 0, "Not enough memory!")
-    new AEPFloatArray(startAddr, size)
-  }
-
-  def AEPFloatArray(iterator: Iterator[Float], size: Long) {
-    AEPFloatArray(size)
-    var i = 0
-    while(iterator.hasNext) {
-      this.set(i, iterator.next())
-      i += 1
-    }
-  }
-
-
-  val MOVE_STEPS = 2
-  val totalBytes: Long = size << MOVE_STEPS
-  assert(totalBytes > 0, "The size of bytes should be larger than 0!")
-
-  val lastOffSet = startAddr + totalBytes
-
-  var deleted: Boolean = false
-
-  def get(i: Long): Double = {
+  override  def get(i: Long): Float = {
     assert(!deleted)
-    Platform.getDouble(null, indexOf(i))
+    Platform.getFloat(null, indexOf(i))
   }
 
-  def set(i: Long, value: Double): Unit = {
+  def getMoveSteps(): Int = AEPFloatArray.MOVE_STEPS
+
+  def set(i: Long, value: Float): Unit = {
     assert(!deleted)
-    Platform.putDouble(null, indexOf(i), value)
-  }
-
-  def free(): Unit = {
-    if (!deleted) {
-      AEPSimulator.free(startAddr)
-      deleted = true
-    }
-  }
-
-  private def indexOf(i: Long): Long = {
-    val index = startAddr + (i << MOVE_STEPS)
-    assert(index < lastOffSet)
-    index
+    Platform.putFloat(null, indexOf(i), value)
   }
 }
