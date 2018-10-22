@@ -16,8 +16,10 @@
 
 package com.intel.analytics.zoo.pipeline.aep
 
-import com.intel.analytics.zoo.aep.{AEPFloatArray, AEPHandler}
+import com.intel.analytics.zoo.aep.{AEPBytesArray, AEPFloatArray, AEPHandler, Bytes}
 import com.intel.analytics.zoo.pipeline.api.keras.ZooSpecHelper
+
+import scala.collection.mutable.ArrayBuffer
 
 class AEPSpec extends ZooSpecHelper {
   "load native lib" should "be ok" in {
@@ -38,10 +40,19 @@ class AEPSpec extends ZooSpecHelper {
   }
 
   "AEPBytesArray" should "be ok" in {
-    val aepArray = new AEPBytesArray(array.toIterator, array.size)
+    val sizeOfItem = 100
+    val sizeOfRecord = 5
+    val addr = AEPHandler.allocate(sizeOfItem * sizeOfRecord)
+    val aepArray = new AEPBytesArray(addr, sizeOfItem, sizeOfRecord)
+    val targetArray = ArrayBuffer[Byte]()
+    val rec = Bytes(Array[Byte](193.toByte, 169.toByte, 0, 90, 4))
+    (0 to 100).foreach {i =>
+      aepArray.set(i, rec)
+    }
+
     var i = 0
-    while( i < aepArray.size) {
-      assert(aepArray.get(i) == array(i))
+    while( i < sizeOfItem) {
+      assert(aepArray.get(i).value === rec.value)
       i += 1
     }
   }

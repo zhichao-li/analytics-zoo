@@ -23,7 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 case class Bytes(value: Array[Byte])
 
 
-class AEPBytesImageArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) extends AEPArray[Bytes](startAddr, size) {
+class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) extends AEPArray[Bytes](startAddr, size) {
 
   override def get(i: Long): Bytes = {
     assert(!deleted)
@@ -31,8 +31,9 @@ class AEPBytesImageArray(val startAddr: Long, val size: Long, val sizeOfBytes: I
     var i = 0
     while(i < sizeOfBytes) {
       var start = indexOf(i)
-      result.append(Platform.getByte(null, indexOf(i)))
+      result.append(Platform.getByte(null, start))
       start += i
+      i +=1
     }
     return Bytes(result.toArray)
   }
