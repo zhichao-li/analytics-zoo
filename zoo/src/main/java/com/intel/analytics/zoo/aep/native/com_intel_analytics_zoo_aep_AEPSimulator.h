@@ -31,13 +31,13 @@ JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_allocate
 JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_free
   (JNIEnv *, jclass, jlong);
 
-/*
- * Class:     com_intel_analytics_zoo_aep_AEPSimulator
- * Method:    get
- * Signature: (JI)F
- */
-JNIEXPORT jfloat JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_get
-  (JNIEnv *, jclass, jlong, jint);
+///*
+// * Class:     com_intel_analytics_zoo_aep_AEPSimulator
+// * Method:    get
+// * Signature: (JI)F
+// */
+//JNIEXPORT jfloat JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_get
+//  (JNIEnv *, jclass, jlong, jint);
 
 #ifdef __cplusplus
 }

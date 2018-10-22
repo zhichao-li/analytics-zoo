@@ -17,10 +17,10 @@ JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_initAEP
  * Signature: (J)J
  */
 JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_allocate
-  (JNIEnv *, jclass, jlong) {
+  (JNIEnv *, jclass, jlong size) {
 
-  float *addr = new float(jlong);
-  return addr;
+  char *addr = new char(size);
+  return (long)addr;
   }
 
 /*
@@ -29,20 +29,21 @@ JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_allocate
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_free
-  (JNIEnv *, jclass, jlong) {
-     delete jlong;
+  (JNIEnv * env, jclass jcl, jlong addr) {
+     char * p = (char *)addr;
+     delete p;
   }
 
-/*
- * Class:     com_intel_analytics_zoo_aep_AEPSimulator
- * Method:    get
- * Signature: (JI)F
- */
-JNIEXPORT jfloat JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_get
-  (JNIEnv * env, jclass jcl, jlong address, jint offset) {
-  return address + offset * 4 *
-
-}
+///*
+// * Class:     com_intel_analytics_zoo_aep_AEPSimulator
+// * Method:    get
+// * Signature: (JI)F
+// */
+//JNIEXPORT jfloat JNICALL Java_com_intel_analytics_zoo_aep_AEPSimulator_get
+//  (JNIEnv * env, jclass jcl, jlong address, jint offset) {
+//  return address + offset * 4 *
+//
+//}
 
 // what's the pointer type return by aep? and how to access the element by that address?
 // how to write the data into that buffer?
