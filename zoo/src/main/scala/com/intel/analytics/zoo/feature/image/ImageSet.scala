@@ -132,7 +132,7 @@ class DistributedImageSet(var rdd: RDD[ImageFeature]) extends ImageSet {
       }).setName("cached dataset")
     newRdd.mapPartitions {iter =>
       iter.map { item =>
-        AEPDataHolder(item)s
+        AEPDataHolder(item)
       }
 
     }

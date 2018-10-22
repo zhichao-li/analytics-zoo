@@ -15,6 +15,17 @@ class AEPFloatArray(val startAddr: Long, val size: Long) {
     assert(startAddr > 0, "Not enough memory!")
     new AEPFloatArray(startAddr, size)
   }
+
+  def AEPFloatArray(iterator: Iterator[Float], size: Long) {
+    AEPFloatArray(size)
+    var i = 0
+    while(iterator.hasNext) {
+      this.set(i, iterator.next())
+      i += 1
+    }
+  }
+
+
   val MOVE_STEPS = 2
   val totalBytes: Long = size << MOVE_STEPS
   assert(totalBytes > 0, "The size of bytes should be larger than 0!")
