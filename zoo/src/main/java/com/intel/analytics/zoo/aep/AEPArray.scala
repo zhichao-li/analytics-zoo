@@ -31,7 +31,7 @@ abstract class AEPArray[T](startAddr: Long, size: Long) {
 
   protected def indexOf(i: Long): Long = {
     val index = startAddr + (i * getMoveSteps())
-    assert(index < lastOffSet)
+    assert(index <= lastOffSet)
     index
   }
 }

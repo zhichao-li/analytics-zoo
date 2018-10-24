@@ -25,17 +25,22 @@ case class Bytes(value: Array[Byte])
 
 class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) extends AEPArray[Bytes](startAddr, size) {
 
+//  override def get(i: Long): Bytes = {
+//    assert(!deleted)
+//    val result = ArrayBuffer[Byte]()
+//    val startOffset = indexOf(i)
+//    var j = 0
+//    while(j < sizeOfBytes) {
+//      result.append(Platform.getByte(null, startOffset + j))
+//      j += 1
+//    }
+//    return Bytes(result.toArray)
+//  }
+
   override def get(i: Long): Bytes = {
-    assert(!deleted)
-    val result = ArrayBuffer[Byte]()
-    var i = 0
-    while(i < sizeOfBytes) {
-      var start = indexOf(i)
-      result.append(Platform.getByte(null, start))
-      start += i
-      i +=1
-    }
-    return Bytes(result.toArray)
+    val result = new Array[Byte](sizeOfBytes)
+    Platform.copyMemory(null, indexOf(i), result, Platform.BYTE_ARRAY_OFFSET, sizeOfBytes)
+    return Bytes(result)
   }
 
   def getMoveSteps(): Int = sizeOfBytes
@@ -43,10 +48,11 @@ class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) e
   // TODO: would be slow if we put byte one by one.
   def set(i: Long, bytes: Bytes): Unit = {
     assert(!deleted)
-    var i = 0
-    while(i < bytes.value.length) {
-      Platform.putByte(null, indexOf(i), bytes.value(i))
-      i += 1
+    val startOffset = indexOf(i)
+    var j = 0
+    while(j < bytes.value.length) {
+      Platform.putByte(null, startOffset + j, bytes.value(j))
+      j += 1
     }
   }
 }
