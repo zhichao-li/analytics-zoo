@@ -11,7 +11,7 @@ object AEPFloatArray {
   val MOVE_STEPS = 4
 
   def apply(size: Long): AEPFloatArray = {
-    val startAddr: Long = Platform.allocateMemory(AEPFloatArray.getTotalBytes(size))
+    val startAddr: Long = AEPHandler.allocate(AEPFloatArray.getTotalBytes(size))
     assert(startAddr > 0, "Not enough memory!")
     new AEPFloatArray(startAddr, size)
   }
@@ -29,7 +29,7 @@ object AEPFloatArray {
 /**
   * An float array with fixed size stored in AEP.
  *  @param startAddr the start address of the array
-  * @param size the size of the array
+  * @param size number of item for this array.
   */
 class AEPFloatArray(val startAddr: Long, val size: Long) extends AEPArray[Float](startAddr, size) {
 

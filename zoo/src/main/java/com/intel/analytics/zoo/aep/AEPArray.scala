@@ -5,7 +5,7 @@ import org.apache.spark.unsafe.Platform
 /**
  *
  * @param startAddr the starting address of this array
- * @param size the item size of this array
+ * @param size number of item for this array
  */
 abstract class AEPArray[T](startAddr: Long, size: Long) {
 

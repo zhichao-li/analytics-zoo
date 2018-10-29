@@ -20,12 +20,30 @@ import org.apache.spark.unsafe.Platform
 
 import scala.collection.mutable.ArrayBuffer
 
-case class Bytes(value: Array[Byte])
+object AEPBytesArray {
+  def apply(iterator: Iterator[Array[Byte]], recordNumber: Int, recordBytes: Int): AEPBytesArray = {
+    val aepArray = AEPBytesArray(recordNumber, recordBytes)
+    var i = 0
+    while(iterator.hasNext) {
+      aepArray.set(i, iterator.next())
+      i += 1
+    }
+    aepArray
+  }
+
+  def apply(recordNumber: Int, recordBytes: Int): AEPBytesArray = {
+//        val startAddr = AEPHandler.allocate(recordNumber * recordBytes)
+    val startAddr: Long = Platform.allocateMemory(recordNumber * recordBytes)
+    assert(startAddr > 0, "Not enough memory!")
+    new AEPBytesArray(startAddr, recordNumber, recordBytes)
+  }
 
 
-class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) extends AEPArray[Bytes](startAddr, size) {
+}
+// length + content? var length of record.
+class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) extends AEPArray[Array[Byte]](startAddr, size) {
 
-//  override def get(i: Long): Bytes = {
+//  override def get(i: Long): Array[Byte] = {
 //    assert(!deleted)
 //    val result = ArrayBuffer[Byte]()
 //    val startOffset = indexOf(i)
@@ -34,24 +52,24 @@ class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) e
 //      result.append(Platform.getByte(null, startOffset + j))
 //      j += 1
 //    }
-//    return Bytes(result.toArray)
+//    return result.toArray
 //  }
 
-  override def get(i: Long): Bytes = {
+  override def get(i: Long): Array[Byte] = {
     val result = new Array[Byte](sizeOfBytes)
     Platform.copyMemory(null, indexOf(i), result, Platform.BYTE_ARRAY_OFFSET, sizeOfBytes)
-    return Bytes(result)
+    return result
   }
 
   def getMoveSteps(): Int = sizeOfBytes
 
   // TODO: would be slow if we put byte one by one.
-  def set(i: Long, bytes: Bytes): Unit = {
+  def set(i: Long, bytes: Array[Byte]): Unit = {
     assert(!deleted)
     val startOffset = indexOf(i)
     var j = 0
-    while(j < bytes.value.length) {
-      Platform.putByte(null, startOffset + j, bytes.value(j))
+    while(j < bytes.length) {
+      Platform.putByte(null, startOffset + j, bytes(j))
       j += 1
     }
   }

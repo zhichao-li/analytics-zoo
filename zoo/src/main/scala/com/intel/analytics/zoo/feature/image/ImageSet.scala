@@ -16,15 +16,26 @@
 
 package com.intel.analytics.zoo.feature.image
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import com.intel.analytics.bigdl.DataSet
-import com.intel.analytics.bigdl.dataset.DataSet
+import com.intel.analytics.bigdl.dataset.{ByteRecord, CachedDistriDataSet, DataSet, DistributedDataSet}
 import com.intel.analytics.bigdl.transform.vision.image.{DistributedImageFrame, ImageFeature, ImageFrame, LocalImageFrame}
+import com.intel.analytics.bigdl.utils.{Engine, RandomGenerator}
+import com.intel.analytics.zoo.aep.AEPBytesArray
 import com.intel.analytics.zoo.common.Utils
 import com.intel.analytics.zoo.feature.common.Preprocessing
+import com.intel.analytics.zoo.pipeline.api.keras.layers.utils.{EngineRef, KerasUtils}
+import com.sun.jndi.cosnaming.IiopUrl.Address
 import org.apache.commons.io.FileUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sparkExtension.SparkExtension
+import org.apache.spark.storage.{BlockId, BlockManagerWrapper, StorageLevel}
 import org.opencv.imgcodecs.Imgcodecs
+
+import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
 
 /**
  * ImageSet wraps a set of ImageFeature
@@ -115,6 +126,138 @@ class DistributedImageSet(var rdd: RDD[ImageFeature]) extends ImageSet {
   }
 }
 
+abstract class ArrayLike[T: ClassTag] extends Serializable {
+  def length: Int = throw new Error()
+
+  def apply(i: Int): T = throw new Error()
+}
+
+case class AEPImageArray(imgs: AEPBytesArray, label: Array[Float]) extends ArrayLike[ByteRecord] {
+  override def length: Int = {
+    imgs.size.toInt
+  }
+
+  override def apply(i: Int): ByteRecord = {
+    ByteRecord(imgs.get(i), label(i))
+  }
+}
+
+case class BlockIdArray(val value: Array[BlockId]) extends ArrayLike[BlockId] {
+  override def length: Int = {
+    value.length
+  }
+
+  override def apply(i: Int): BlockId = {
+    value(i)
+  }
+}
+
+/**
+ * Wrap a RDD as a DataSet.
+ * @param buffer
+ */
+// T is the returning value type. like ByteRecord
+class AEPCachedDataSet[A: ClassTag, T: ClassTag]
+(buffer: RDD[ArrayLike[A]], converter: A => T)
+  extends DistributedDataSet[T] {
+
+  protected lazy val count: Long = buffer.mapPartitions(iter => {
+    require(iter.hasNext)
+    val array = iter.next()
+    require(!iter.hasNext)
+    Iterator.single(array.length)
+  }).reduce(_ + _)
+
+  protected var indexes: RDD[Array[Int]] = buffer.mapPartitions(iter => {
+    Iterator.single((0 until iter.next().length).toArray)
+  }).setName("original index").cache()
+
+
+  override def data(train: Boolean): RDD[T] = {
+    val _train = train
+    val _converter = converter
+    buffer.zipPartitions(indexes)((dataIter, indexIter) => {
+      val indexes = indexIter.next()
+      val indexOffset = math.max(1, indexes.length)
+      val localData = dataIter.next()
+      val offset = if (_train) {
+        RandomGenerator.RNG.uniform(0, indexOffset).toInt
+      } else {
+        0
+      }
+      new Iterator[T] {
+        private val _offset = new AtomicInteger(offset)
+
+        override def hasNext: Boolean = {
+          if (_train) true else _offset.get() < localData.length
+        }
+
+        override def next(): T = {
+          val i = _offset.getAndIncrement()
+          if (_train) {
+            _converter(localData(indexes(i % localData.length)))
+          } else {
+            if (i < localData.length) {
+              _converter(localData(indexes(i)))
+            } else {
+              null.asInstanceOf[T]
+            }
+          }
+        }
+      }
+    })
+  }
+
+  override def size(): Long = count
+
+  override def shuffle(): Unit = {
+      indexes.unpersist()
+      indexes = buffer.mapPartitions(iter => {
+        Iterator.single(RandomGenerator.shuffle((0 until iter.next().length).toArray))
+      }).setName("shuffled index").cache()
+  }
+
+  override def originRDD(): RDD[_] = buffer
+
+  override def cache(): Unit = {
+    buffer.count()
+    indexes.count()
+    isCached = true
+  }
+
+  override def unpersist(): Unit = {
+    buffer.unpersist()
+    indexes.unpersist()
+    isCached = false
+  }
+}
+
+
+class AEPImageSet(var rdd: RDD[ByteRecord]) extends ImageSet {
+  // RDD[ByteRecord] ==cached=> RDD[(AEPBytesRecord)] => RDD[ImageFeature]
+
+  // TODO: we should cached the original rdd here.
+  val rddOfImageFeature = rdd.map{ rec => ImageFeature(rec.data, rec.label)}
+
+  override def transform(transformer: Preprocessing[ImageFeature, ImageFeature]): ImageSet = {
+    transformer(rddOfImageFeature)
+    this
+  }
+
+  override def isLocal(): Boolean = false
+
+  override def isDistributed(): Boolean = true
+
+  override def toImageFrame(): ImageFrame = {
+    ImageFrame.rdd(rddOfImageFeature)
+  }
+
+  override def toDataSet(): DataSet[ImageFeature] = {
+     DataSet.rdd[ImageFeature](rddOfImageFeature)
+    // TODO: cache with AEP here. and should not use DataSet.rdd
+  }
+}
+
 object ImageSet {
 
   /**
@@ -141,6 +284,66 @@ object ImageSet {
   def rdd(data: RDD[ImageFeature]): DistributedImageSet = {
     new DistributedImageSet(data)
   }
+//
+//  def cacheWithBlockManager[D](data: RDD[BlockId]): AEPCachedDataSet[BlockId, D] = {
+//    val nodeNumber = EngineRef.getNodeNumber()
+//    val coaleasedRdd = data.coalesce(nodeNumber, true)
+//    val countPerPartition = coaleasedRdd.mapPartitions{iter =>
+//      require(iter.hasNext)
+//      val byteRecord = iter.next()
+//      // iter.next() has consumed an item, so we need to add 1 here.
+//      Iterator.single(iter.size + 1)}
+//    val result = coaleasedRdd.zipPartitions(countPerPartition){(dataIter, countIter) => {
+//      val count = countIter.next()
+//      var i = 0
+//      val result = ArrayBuffer[BlockId]()
+//      // Array[blockid]
+//      while(dataIter.hasNext) {
+//        val data = dataIter.next()
+//        val blockId = SparkExtension.getLocalBlockId(i + "") // TODO: blockId should be uniqe across
+//        // cluster
+//        BlockManagerWrapper.putSingle(blockId, data, StorageLevel
+//          .MEMORY_AND_DISK)
+//        i += 1
+//      }
+//      Iterator.single(new BlockIdArray(result.toArray))
+//    }}.setName("cached AEP images")
+//      .cache()
+//
+//    new AEPCachedDataSet[BlockId, D](result.asInstanceOf[RDD[ArrayLike[BlockId]]],
+//      (x: BlockId) => {
+//
+//      })
+//  }
+
+
+  def cacheWithAEP(data: RDD[ByteRecord]): AEPCachedDataSet[ByteRecord, ByteRecord] = {
+    val nodeNumber = EngineRef.getNodeNumber()
+    val coaleasedRdd = data.coalesce(nodeNumber, true)
+    val countPerPartition = coaleasedRdd.mapPartitions{iter =>
+      require(iter.hasNext)
+      val byteRecord = iter.next()
+      // iter.next() has consumed an item, so we need to add 1 here.
+      Iterator.single((iter.size + 1, byteRecord.data.length))}
+    val result = coaleasedRdd.zipPartitions(countPerPartition){(dataIter, countIter) => {
+      val count = countIter.next()
+      val aepArray = AEPBytesArray(count._1, count._2)
+      val labelBuffer = ArrayBuffer[Float]()
+      var i = 0
+      while(dataIter.hasNext) {
+        val data = dataIter.next()
+        aepArray.set(i, data.data)
+        labelBuffer.append(data.label)
+        i += 1
+      }
+      Iterator.single(AEPImageArray(aepArray, labelBuffer.toArray))
+      }}.setName("cached AEP images")
+      .cache()
+
+    new AEPCachedDataSet[ByteRecord, ByteRecord](result.asInstanceOf[RDD[ArrayLike[ByteRecord]]],
+      (x: ByteRecord) => x)
+  }
+
 
   /**
    * create DistributedImageSet for a RDD of array bytes
