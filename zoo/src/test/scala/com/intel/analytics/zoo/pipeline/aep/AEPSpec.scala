@@ -19,8 +19,10 @@ package com.intel.analytics.zoo.pipeline.aep
 import com.intel.analytics.bigdl.dataset.image.{HFlip, _}
 import com.intel.analytics.bigdl.dataset.{ByteRecord, DataSet, DistributedDataSet, MiniBatch}
 import com.intel.analytics.bigdl.utils.Engine
-import com.intel.analytics.zoo.aep.{AEPBytesArray, AEPFloatArray, AEPHandler}
+import com.intel.analytics.zoo.aep.{AEPBytesArray, AEPFloatArray, AEPHandler, AEPVarBytesArray}
+import com.intel.analytics.zoo.common.NNContext
 import com.intel.analytics.zoo.feature.image.ImageSet
+import com.intel.analytics.zoo.models.image.inception.ImageNet2012
 import com.intel.analytics.zoo.pipeline.api.keras.ZooSpecHelper
 import org.apache.hadoop.io.Text
 import org.apache.spark.SparkContext
@@ -28,6 +30,20 @@ import org.apache.spark.SparkContext
 import scala.collection.mutable.ArrayBuffer
 
 class AEPSpec extends ZooSpecHelper {
+  var sc: SparkContext = null
+
+  override def doBefore(): Unit = {
+    val conf = Engine.createSparkConf().setAppName("AEPSpec")
+      .set("spark.task.maxFailures", "1").setMaster("local[4]")
+    sc = NNContext.initNNContext(conf)
+  }
+
+  override def doAfter(): Unit = {
+    if (sc != null) {
+      sc.stop()
+    }
+  }
+
   "load native lib" should "be ok" in {
     val address = AEPHandler.allocate(1000L)
     AEPHandler.free(address)
@@ -39,7 +55,7 @@ class AEPSpec extends ZooSpecHelper {
     val array = Array[Float](1.2f, 0.3f, 4.5f, 199999.6f)
     val aepArray = AEPFloatArray(array.toIterator, array.size)
     var i = 0
-    while( i < aepArray.size) {
+    while( i < aepArray.recordNum) {
       assert(aepArray.get(i) == array(i))
       i += 1
     }
@@ -49,7 +65,7 @@ class AEPSpec extends ZooSpecHelper {
   "AEPBytesArray" should "be ok" in {
     val sizeOfItem = 100
     val sizeOfRecord = 5
-    val aepArray = AEPBytesArray(sizeOfItem, sizeOfRecord)
+    val aepArray = new AEPBytesArray(sizeOfItem, sizeOfRecord)
     val targetArray = ArrayBuffer[Byte]()
     val rec = Array[Byte](193.toByte, 169.toByte, 0, 90, 4)
     (0 until 100).foreach {i =>
@@ -62,53 +78,37 @@ class AEPSpec extends ZooSpecHelper {
       i += 1
       println(i)
     }
-    // TODO: there's problem when invoke free here.
     aepArray.free()
   }
 
+  "AEPvarBytesArray" should "be ok" in {
+    val aepArray = new AEPVarBytesArray(3, 5 + 2 + 6)
+    val targetArray = ArrayBuffer[Byte]()
+    val rec1 = Array[Byte](193.toByte, 169.toByte, 0, 90, 4)
+    val rec2 = Array[Byte](90, 4)
+    val rec3 = Array[Byte](193.toByte, 169.toByte, 0, 90, 4, 5)
+
+    aepArray.set(0, rec1)
+    aepArray.set(1, rec2)
+    aepArray.set(2, rec3)
+    aepArray.free()
+  }
+
+
   "cached imageset" should "be ok" in {
-    def readLabel(data: Text): String = {
-      val dataArr = data.toString.split("\n")
-      if (dataArr.length == 1) {
-        dataArr(0)
-      } else {
-        dataArr(1)
-      }
-    }
-    val classNum = 1000
-    val conf = Engine.createSparkConf().setAppName("BigDL InceptionV1 Train Example")
-      .set("spark.task.maxFailures", "1").setMaster("local[2]")
-    val sc = new SparkContext(conf)
-    Engine.init
 
-    val nodeNumber = 1
-    val coreNumber = 4
-    val resource = getClass.getClassLoader.getResource("aep/mini_imagenet_seq")
-    val dataPath = "/home/lizhichao/data/imagenet-noresize-super-small" //resource.getPath
-    val rawData = sc.sequenceFile(dataPath, classOf[Text],
-      classOf[Text],
-      nodeNumber * coreNumber)
-      .map(image => {
-      ByteRecord(image._2.copyBytes(), readLabel(image._1).toFloat)
-    }).filter(_.label <= classNum)
-//    val dataSet = DataSet.rdd(rawData)
+    val dataPath = getClass.getClassLoader.getResource("aep/mini_imagenet_seq").getPath
 
-    val dataSet = ImageSet.cacheWithAEP(rawData)
-    val num = dataSet.data(train = false).count
-    assert(num == 5)
-
-    val imageSize = 224
-    val batchSize = 1
-    val transformedDataSet = dataSet.transform(
-      MTLabeledBGRImgToBatch[ByteRecord](
-        width = imageSize,
-        height = imageSize,
-        batchSize = batchSize,
-        transformer = (BytesToBGRImg() ) -> BGRImgCropper(imageSize, imageSize)
-          //-> HFlip(0.5) -> BGRImgNormalizer(0.485, 0.456, //0.406, 0.229, 0.224, 0.225)
-      ))
-    val ddd =transformedDataSet.asInstanceOf[DistributedDataSet[MiniBatch[Float]]].data(train =
-      false).count()
-    ddd
+    val imageNet = ImageNet2012(path = dataPath,
+      sc = sc,
+      imageSize = 224,
+      batchSize = 2,
+      nodeNumber = 1,
+      coresPerNode = 4,
+      classNumber = 1000,
+      cacheWithAEP = true).asInstanceOf[DistributedDataSet[MiniBatch[Float]]]
+    val data = imageNet.data(train = false)
+    assert(data.count() == 3)
+    data.collect()
   }
 }

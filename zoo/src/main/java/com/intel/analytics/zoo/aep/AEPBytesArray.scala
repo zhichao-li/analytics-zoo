@@ -16,13 +16,13 @@
 
 package com.intel.analytics.zoo.aep
 
-import org.apache.spark.unsafe.Platform
+import java.util
 
-import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.unsafe.Platform
 
 object AEPBytesArray {
   def apply(iterator: Iterator[Array[Byte]], recordNumber: Int, recordBytes: Int): AEPBytesArray = {
-    val aepArray = AEPBytesArray(recordNumber, recordBytes)
+    val aepArray = new AEPBytesArray(recordNumber, recordBytes)
     var i = 0
     while(iterator.hasNext) {
       aepArray.set(i, iterator.next())
@@ -30,18 +30,57 @@ object AEPBytesArray {
     }
     aepArray
   }
+}
 
-  def apply(recordNumber: Int, recordBytes: Int): AEPBytesArray = {
-//        val startAddr = AEPHandler.allocate(recordNumber * recordBytes)
-    val startAddr: Long = Platform.allocateMemory(recordNumber * recordBytes)
-    assert(startAddr > 0, "Not enough memory!")
-    new AEPBytesArray(startAddr, recordNumber, recordBytes)
+class AEPVarBytesArray(val recordNum: Int, totalSizeByBytes: Long) extends
+  AEPArray[Array[Byte]](totalSizeByBytes) {
+
+  // TODO: maybe this can be changed to offhead long array
+  val indexer = new Array[(Long, Int)](recordNum)
+
+  private def isValidIndex(i: Int): Boolean = {
+      indexer(i) != null
+  }
+  override def get(i: Int): Array[Byte] = {
+    assert(isValidIndex(i))
+    val recordLen = indexer(i)._2
+    val index = indexer(i)._1
+    val result = new Array[Byte](recordLen)
+    Platform.copyMemory(null, indexOf(i), result, Platform.BYTE_ARRAY_OFFSET, recordLen)
+    return result
   }
 
+  // TODO: would be slow if we put byte one by one.
+  def set(i: Int, bytes: Array[Byte]): Unit = {
+    assert(!deleted)
+    if (!isValidIndex(i)) {
+      val startOffset = if (i == 0) {
+        this.startAddr
+      } else {
+        assert(isValidIndex(i - 1))
+        indexer(i - 1)._1 + indexer(i - 1)._2
+      }
+      indexer(i) = (startOffset, bytes.length)
+    }
+    val startOffset = indexOf(i)
+    var j = 0
+    while(j < bytes.length) {
+      Platform.putByte(null, startOffset + j, bytes(j))
+      j += 1
+    }
+  }
+
+  def indexOf(i: Int): Long = {
+    assert(isValidIndex(i))
+    return indexer(i)._1
+  }
 
 }
+
+
 // length + content? var length of record.
-class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) extends AEPArray[Array[Byte]](startAddr, size) {
+class AEPBytesArray(val numOfRecord: Long, val sizeOfRecordByByte: Int) extends
+  AEPArray[Array[Byte]](numOfRecord * sizeOfRecordByByte) {
 
 //  override def get(i: Long): Array[Byte] = {
 //    assert(!deleted)
@@ -55,16 +94,14 @@ class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) e
 //    return result.toArray
 //  }
 
-  override def get(i: Long): Array[Byte] = {
-    val result = new Array[Byte](sizeOfBytes)
-    Platform.copyMemory(null, indexOf(i), result, Platform.BYTE_ARRAY_OFFSET, sizeOfBytes)
+  override def get(i: Int): Array[Byte] = {
+    val result = new Array[Byte](sizeOfRecordByByte)
+    Platform.copyMemory(null, indexOf(i), result, Platform.BYTE_ARRAY_OFFSET, sizeOfRecordByByte)
     return result
   }
 
-  def getMoveSteps(): Int = sizeOfBytes
-
   // TODO: would be slow if we put byte one by one.
-  def set(i: Long, bytes: Array[Byte]): Unit = {
+  def set(i: Int, bytes: Array[Byte]): Unit = {
     assert(!deleted)
     val startOffset = indexOf(i)
     var j = 0
@@ -72,6 +109,12 @@ class AEPBytesArray(val startAddr: Long, val size: Long, val sizeOfBytes: Int) e
       Platform.putByte(null, startOffset + j, bytes(j))
       j += 1
     }
+  }
+
+  def indexOf(i: Int): Long = {
+    val index = startAddr + (i * sizeOfRecordByByte)
+    assert(index <= lastOffSet)
+    index
   }
 }
 

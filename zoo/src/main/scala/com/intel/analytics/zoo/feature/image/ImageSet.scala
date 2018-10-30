@@ -16,13 +16,15 @@
 
 package com.intel.analytics.zoo.feature.image
 
-import java.util.concurrent.atomic.AtomicInteger
+import java.io.{FileOutputStream, ObjectOutputStream}
+import java.nio.ByteBuffer
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 
 import com.intel.analytics.bigdl.DataSet
 import com.intel.analytics.bigdl.dataset.{ByteRecord, CachedDistriDataSet, DataSet, DistributedDataSet}
 import com.intel.analytics.bigdl.transform.vision.image.{DistributedImageFrame, ImageFeature, ImageFrame, LocalImageFrame}
 import com.intel.analytics.bigdl.utils.{Engine, RandomGenerator}
-import com.intel.analytics.zoo.aep.AEPBytesArray
+import com.intel.analytics.zoo.aep.{AEPBytesArray, AEPVarBytesArray}
 import com.intel.analytics.zoo.common.Utils
 import com.intel.analytics.zoo.feature.common.Preprocessing
 import com.intel.analytics.zoo.pipeline.api.keras.layers.utils.{EngineRef, KerasUtils}
@@ -132,25 +134,16 @@ abstract class ArrayLike[T: ClassTag] extends Serializable {
   def apply(i: Int): T = throw new Error()
 }
 
-case class AEPImageArray(imgs: AEPBytesArray, label: Array[Float]) extends ArrayLike[ByteRecord] {
+case class AEPImageArray(imgs: AEPVarBytesArray, label: Array[Float]) extends ArrayLike[ByteRecord] {
   override def length: Int = {
-    imgs.size.toInt
+    imgs.recordNum
   }
 
   override def apply(i: Int): ByteRecord = {
-    ByteRecord(imgs.get(i), label(i))
+    ByteRecord(imgs.get(i), label(i.toInt)) // TODO: we may change this to Long
   }
 }
 
-case class BlockIdArray(val value: Array[BlockId]) extends ArrayLike[BlockId] {
-  override def length: Int = {
-    value.length
-  }
-
-  override def apply(i: Int): BlockId = {
-    value(i)
-  }
-}
 
 /**
  * Wrap a RDD as a DataSet.
@@ -169,7 +162,7 @@ class AEPCachedDataSet[A: ClassTag, T: ClassTag]
   }).reduce(_ + _)
 
   protected var indexes: RDD[Array[Int]] = buffer.mapPartitions(iter => {
-    Iterator.single((0 until iter.next().length).toArray)
+    Iterator.single[Array[Int]]((0 until iter.next().length.toInt).toArray[Int])
   }).setName("original index").cache()
 
 
@@ -195,6 +188,8 @@ class AEPCachedDataSet[A: ClassTag, T: ClassTag]
         override def next(): T = {
           val i = _offset.getAndIncrement()
           if (_train) {
+            // indexes is an Array, we should improve this
+            // meaning the maximum value is limited by Int
             _converter(localData(indexes(i % localData.length)))
           } else {
             if (i < localData.length) {
@@ -236,8 +231,10 @@ class AEPCachedDataSet[A: ClassTag, T: ClassTag]
 class AEPImageSet(var rdd: RDD[ByteRecord]) extends ImageSet {
   // RDD[ByteRecord] ==cached=> RDD[(AEPBytesRecord)] => RDD[ImageFeature]
 
-  // TODO: we should cached the original rdd here.
-  val rddOfImageFeature = rdd.map{ rec => ImageFeature(rec.data, rec.label)}
+  private val rddOfByteRecordWithCache = ImageSet.cacheWithAEP(rdd).data(train = false)
+
+  private val rddOfImageFeature = rddOfByteRecordWithCache.map{ rec => ImageFeature(rec.data, rec
+    .label)}
 
   override def transform(transformer: Preprocessing[ImageFeature, ImageFeature]): ImageSet = {
     transformer(rddOfImageFeature)
@@ -322,16 +319,25 @@ object ImageSet {
     val coaleasedRdd = data.coalesce(nodeNumber, true)
     val countPerPartition = coaleasedRdd.mapPartitions{iter =>
       require(iter.hasNext)
-      val byteRecord = iter.next()
-      // iter.next() has consumed an item, so we need to add 1 here.
-      Iterator.single((iter.size + 1, byteRecord.data.length))}
+      var totalBytes: Long = 0L
+      var totalRecordNum = 0
+      while(iter.hasNext) {
+        val byteRecord = iter.next()
+        totalRecordNum += 1
+        totalBytes += byteRecord.data.length
+      }
+      Iterator.single((totalRecordNum, totalBytes))
+    }
     val result = coaleasedRdd.zipPartitions(countPerPartition){(dataIter, countIter) => {
       val count = countIter.next()
-      val aepArray = AEPBytesArray(count._1, count._2)
+      val aepArray = new AEPVarBytesArray(count._1, count._2)
       val labelBuffer = ArrayBuffer[Float]()
       var i = 0
       while(dataIter.hasNext) {
         val data = dataIter.next()
+        val imgBuffer = ByteBuffer.wrap(data.data)
+        val width = imgBuffer.getInt
+        val height = imgBuffer.getInt
         aepArray.set(i, data.data)
         labelBuffer.append(data.label)
         i += 1

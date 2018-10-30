@@ -4,23 +4,22 @@ import org.apache.spark.unsafe.Platform
 
 /**
  *
- * @param startAddr the starting address of this array
- * @param size number of item for this array
+ * @param totalBytes
  */
-abstract class AEPArray[T](startAddr: Long, size: Long) {
+abstract class AEPArray[T](totalBytes: Long) {
 
-  val totalBytes: Long = size * getMoveSteps()
+  //        val startAddr = AEPHandler.allocate(recordNumber * recordBytes)
+  val startAddr: Long = Platform.allocateMemory(totalBytes)
+  assert(startAddr > 0, "Not enough memory!")
   assert(totalBytes > 0, "The size of bytes should be larger than 0!")
 
   val lastOffSet = startAddr + totalBytes
 
   var deleted: Boolean = false
 
-  def getMoveSteps(): Int
+  def get(i: Int): T
 
-  def get(i: Long): T
-
-  def set(i: Long, value: T): Unit
+  def set(i: Int, value: T): Unit
 
   def free(): Unit = {
     if (!deleted) {
@@ -29,9 +28,5 @@ abstract class AEPArray[T](startAddr: Long, size: Long) {
     }
   }
 
-  protected def indexOf(i: Long): Long = {
-    val index = startAddr + (i * getMoveSteps())
-    assert(index <= lastOffSet)
-    index
-  }
+  protected def indexOf(i: Int): Long
 }

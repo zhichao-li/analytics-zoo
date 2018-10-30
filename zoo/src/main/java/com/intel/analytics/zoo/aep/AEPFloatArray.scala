@@ -10,14 +10,8 @@ object AEPFloatArray {
   }
   val MOVE_STEPS = 4
 
-  def apply(size: Long): AEPFloatArray = {
-    val startAddr: Long = AEPHandler.allocate(AEPFloatArray.getTotalBytes(size))
-    assert(startAddr > 0, "Not enough memory!")
-    new AEPFloatArray(startAddr, size)
-  }
-
-  def apply(iterator: Iterator[Float], size: Long): AEPFloatArray = {
-    val aepArray = AEPFloatArray(size)
+  def apply(iterator: Iterator[Float], numOfRecord: Int): AEPFloatArray = {
+    val aepArray = new AEPFloatArray(numOfRecord)
     var i = 0
     while(iterator.hasNext) {
       aepArray.set(i, iterator.next())
@@ -28,20 +22,26 @@ object AEPFloatArray {
 }
 /**
   * An float array with fixed size stored in AEP.
- *  @param startAddr the start address of the array
-  * @param size number of item for this array.
+  * @param recordNum number of item for this array.
   */
-class AEPFloatArray(val startAddr: Long, val size: Long) extends AEPArray[Float](startAddr, size) {
+class AEPFloatArray(val recordNum: Int) extends AEPArray[Float](
+  recordNum * AEPFloatArray.MOVE_STEPS) {
 
-  override  def get(i: Long): Float = {
+  override  def get(i: Int): Float = {
     assert(!deleted)
     Platform.getFloat(null, indexOf(i))
   }
 
   def getMoveSteps(): Int = AEPFloatArray.MOVE_STEPS
 
-  def set(i: Long, value: Float): Unit = {
+  def set(i: Int, value: Float): Unit = {
     assert(!deleted)
     Platform.putFloat(null, indexOf(i), value)
+  }
+
+  protected def indexOf(i: Int): Long = {
+    val index = startAddr + (i * AEPFloatArray.MOVE_STEPS)
+    assert(index <= lastOffSet)
+    index
   }
 }
