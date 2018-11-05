@@ -3,7 +3,16 @@
 #include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cstdio>
+#include <cstdint>
+#include <cstdlib>
+#include <cassert>
+#include <stdexcept>
+
 #include "com_intel_analytics_zoo_aep_AEPHandler.h"
+
+using memkind = struct memkind;
+memkind *pmemkind = NULL;
 
 /*
  * Class:     com_intel_analytics_zoo_aep_AEPHandler
@@ -11,7 +20,20 @@
  * Signature: (Ljava/lang/String;J)V
  */
 JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_initialize
-  (JNIEnv *, jclass, jstring, jlong) {}
+  (JNIEnv *env, jclass, jstring path, jlong size) {
+    const char* str = env->GetStringUTFChars(path, NULL);
+    if (NULL == str) {
+      throw std::invalid_argument("Initial path can't be NULL.\n");
+    }
+
+    size_t sz = (size_t)size;
+    int error = memkind_create_pmem(str, sz, &pmemkind);
+    if (error) {
+      throw std::runtime_error("memkind_create_pmem failed!\n");
+    }
+
+    env->ReleaseStringUTFChars(path, str);
+  }
 
 /*
  * Class:     com_intel_analytics_zoo_aep_AEPHandler
@@ -20,10 +42,17 @@ JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_initialize
  */
 JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_allocate
   (JNIEnv *, jclass, jlong size) {
-//  char *addr = new char(size);
-//  return (long)addr;
-    void* ptr = (void*) malloc(size);
-    return (jlong)ptr;
+//    void* ptr = (void*) malloc(size);
+//    return (jlong)ptr;
+  if (NULL == pmemkind) {
+    throw std::invalid_argument("We should init the AEP memory first.\n");
+  }
+  size_t sz = (size_t)size;
+  void *p = memkind_malloc(pmemkind, sz);
+  // if (p == NULL) {
+  //  throw std::runtime_error("Out of memory!\n");
+  // }
+  return (jlong)p;
   }
 
 /*
@@ -33,9 +62,12 @@ JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_allocate
  */
 JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_free
   (JNIEnv *, jclass, jlong addr) {
-  free((void *)addr);
-//       char * p = (char *)addr;
-//       delete p;
+//  free((void *)addr);
+  if (NULL == pmemkind) {
+    throw std::invalid_argument("We should init the AEP memory first.\n");
+  }
+
+  memkind_free(pmemkind, (void *)addr);
   }
 
 /*

@@ -9,11 +9,12 @@ OBJECTS=$(TARGET_DIR)/aep.o
 all: $(LIB)
 
 $(LIB): $(OBJECTS)
-		$(CC) -Wall -shared $(OBJECTS) -lm -o $@
+		$(CC) -Wall -shared $(OBJECTS) -lm -L /home/lizhichao/bin/god/memkind/ -l memkind -o $@
 
 $(OBJECTS): $(SOURCES)
 		mkdir -p $(TARGET_DIR)
-		$(CC) -c -I ${JAVA_HOME}/include -I ${JAVA_HOME}/include/linux -fPIC $< -o $@
+		$(CC) -c -std=c++11 -I ${JAVA_HOME}/include -I ${JAVA_HOME}/include/linux -fPIC $<
+		-o $@
 
 clean:
 		rm -rf $(OBJECTS) $(LIB)
