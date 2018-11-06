@@ -36,6 +36,8 @@ class AEPSpec extends ZooSpecHelper {
     val conf = Engine.createSparkConf().setAppName("AEPSpec")
       .set("spark.task.maxFailures", "1").setMaster("local[4]")
     sc = NNContext.initNNContext(conf)
+    AEPHandler.initialize("/mnt/pmem0/test", 1024* 1024 * 1000)
+    println("hello")
   }
 
   override def doAfter(): Unit = {
@@ -50,8 +52,6 @@ class AEPSpec extends ZooSpecHelper {
   }
 
   "AEPFloatArray" should "be ok" in {
-    val address = AEPHandler.allocate(1000)
-    AEPHandler.free(address)
     val array = Array[Float](1.2f, 0.3f, 4.5f, 199999.6f)
     val aepArray = AEPFloatArray(array.toIterator, array.size)
     var i = 0

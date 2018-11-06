@@ -9,7 +9,7 @@ public class AEPHandler {
         }
     }
 
-    private static native void initialize(String path, long size);
+    public static native void initialize(String path, long size);
 
     public static native long allocate(long size);
 

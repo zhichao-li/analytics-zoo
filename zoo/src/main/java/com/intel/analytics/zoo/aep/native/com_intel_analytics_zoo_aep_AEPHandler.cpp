@@ -8,11 +8,20 @@
 #include <cstdlib>
 #include <cassert>
 #include <stdexcept>
+#include <sstream>
+#include <string>
+#include <iostream>
 
 #include "com_intel_analytics_zoo_aep_AEPHandler.h"
+using namespace std;
 
-using memkind = struct memkind;
-memkind *pmemkind = NULL;
+
+//using memkind = struct memkind;
+//memkind *pmemkind = NULL;
+
+struct memkind *pmem_kind;
+
+#define PMEM_MAX_SIZE ((size_t)1024 * 1024 * 1024 * 128)
 
 /*
  * Class:     com_intel_analytics_zoo_aep_AEPHandler
@@ -25,11 +34,19 @@ JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_initialize
     if (NULL == str) {
       throw std::invalid_argument("Initial path can't be NULL.\n");
     }
+    std::cout<<str<<"\n";
+    std::cout<<size<<"\n";
 
     size_t sz = (size_t)size;
-    int error = memkind_create_pmem(str, sz, &pmemkind);
+    int error = memkind_create_pmem("/mnt/pmem0", sz, &pmem_kind);
+
+//    int error = memkind_create_pmem("/mnt/pmem0", PMEM_MAX_SIZE, &pmem_kind);
     if (error) {
-      throw std::runtime_error("memkind_create_pmem failed!\n");
+    std::stringstream ss;
+    char msg[200];
+    memkind_error_message(error, msg, 200);
+    ss << "memkind_create_pmem failed! error code is: " << error << msg <<"\n";
+    throw std::runtime_error(ss.str());
     }
 
     env->ReleaseStringUTFChars(path, str);
@@ -44,11 +61,11 @@ JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_allocate
   (JNIEnv *, jclass, jlong size) {
 //    void* ptr = (void*) malloc(size);
 //    return (jlong)ptr;
-  if (NULL == pmemkind) {
+  if (NULL == pmem_kind) {
     throw std::invalid_argument("We should init the AEP memory first.\n");
   }
   size_t sz = (size_t)size;
-  void *p = memkind_malloc(pmemkind, sz);
+  void *p = memkind_malloc(pmem_kind, sz);
   // if (p == NULL) {
   //  throw std::runtime_error("Out of memory!\n");
   // }
@@ -63,11 +80,11 @@ JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_allocate
 JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_free
   (JNIEnv *, jclass, jlong addr) {
 //  free((void *)addr);
-  if (NULL == pmemkind) {
+  if (NULL == pmem_kind) {
     throw std::invalid_argument("We should init the AEP memory first.\n");
   }
 
-  memkind_free(pmemkind, (void *)addr);
+  memkind_free(pmem_kind, (void *)addr);
   }
 
 /*
