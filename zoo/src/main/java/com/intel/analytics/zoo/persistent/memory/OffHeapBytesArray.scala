@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.intel.analytics.zoo.aep
+package com.intel.analytics.zoo.persistent.memory
 
 import java.util
 
 import org.apache.spark.unsafe.Platform
 
-object AEPBytesArray {
-  def apply(iterator: Iterator[Array[Byte]], recordNumber: Int, recordBytes: Int): AEPBytesArray = {
-    val aepArray = new AEPBytesArray(recordNumber, recordBytes)
+object OptaneDCVarBytesArray {
+  def apply(iterator: Iterator[Array[Byte]], recordNumber: Int, recordBytes: Int): OffHeapBytesArray = {
+    val aepArray = new OffHeapBytesArray(recordNumber, recordBytes)
     var i = 0
     while(iterator.hasNext) {
       aepArray.set(i, iterator.next())
@@ -32,8 +32,9 @@ object AEPBytesArray {
   }
 }
 
-class AEPVarBytesArray(val recordNum: Int, totalSizeByBytes: Long) extends
-  AEPArray[Array[Byte]](totalSizeByBytes) {
+class OffHeapVarBytesArray(val recordNum: Int, totalSizeByBytes: Long,
+    memoryType: MemoryType = OptaneDC) extends
+  OffHeapArray[Array[Byte]](totalSizeByBytes, memoryType) {
 
   // TODO: maybe this can be changed to offhead long array
   val indexer = new Array[(Long, Int)](recordNum)
@@ -78,9 +79,9 @@ class AEPVarBytesArray(val recordNum: Int, totalSizeByBytes: Long) extends
 }
 
 
-// length + content? var length of record.
-class AEPBytesArray(val numOfRecord: Long, val sizeOfRecordByByte: Int) extends
-  AEPArray[Array[Byte]](numOfRecord * sizeOfRecordByByte) {
+class OffHeapBytesArray(val numOfRecord: Long, val sizeOfRecordByByte: Int,
+    memoryType: MemoryType = OptaneDC) extends
+  OffHeapArray[Array[Byte]](numOfRecord * sizeOfRecordByByte, memoryType) {
 
 //  override def get(i: Long): Array[Byte] = {
 //    assert(!deleted)

@@ -19,25 +19,24 @@ package com.intel.analytics.zoo.pipeline.aep
 import com.intel.analytics.bigdl.dataset.image.{HFlip, _}
 import com.intel.analytics.bigdl.dataset.{ByteRecord, DataSet, DistributedDataSet, MiniBatch}
 import com.intel.analytics.bigdl.utils.Engine
-import com.intel.analytics.zoo.aep.{AEPBytesArray, AEPFloatArray, AEPHandler, AEPVarBytesArray}
 import com.intel.analytics.zoo.common.NNContext
 import com.intel.analytics.zoo.feature.image.ImageSet
 import com.intel.analytics.zoo.models.image.inception.ImageNet2012
+import com.intel.analytics.zoo.persistent.memory._
 import com.intel.analytics.zoo.pipeline.api.keras.ZooSpecHelper
 import org.apache.hadoop.io.Text
 import org.apache.spark.SparkContext
 
 import scala.collection.mutable.ArrayBuffer
 
-class AEPSpec extends ZooSpecHelper {
+class PersistentMemorySpec extends ZooSpecHelper {
   var sc: SparkContext = null
 
   override def doBefore(): Unit = {
-    val conf = Engine.createSparkConf().setAppName("AEPSpec")
+    val conf = Engine.createSparkConf().setAppName("PersistentMemorySpec")
       .set("spark.task.maxFailures", "1").setMaster("local[4]")
     sc = NNContext.initNNContext(conf)
-    AEPHandler.initialize("/mnt/pmem0/test", 1024* 1024 * 1000)
-    println("hello")
+    PersistentMemoryAllocator.allocate(1024* 1024 * 1000)
   }
 
   override def doAfter(): Unit = {
@@ -47,13 +46,13 @@ class AEPSpec extends ZooSpecHelper {
   }
 
   "load native lib" should "be ok" in {
-    val address = AEPHandler.allocate(1000L)
-    AEPHandler.free(address)
+    val address = PersistentMemoryAllocator.allocate(1000L)
+    PersistentMemoryAllocator.free(address)
   }
 
   "AEPFloatArray" should "be ok" in {
     val array = Array[Float](1.2f, 0.3f, 4.5f, 199999.6f)
-    val aepArray = AEPFloatArray(array.toIterator, array.size)
+    val aepArray = OptaneDCFloatArray(array.toIterator, array.size)
     var i = 0
     while( i < aepArray.recordNum) {
       assert(aepArray.get(i) == array(i))
@@ -65,7 +64,7 @@ class AEPSpec extends ZooSpecHelper {
   "AEPBytesArray" should "be ok" in {
     val sizeOfItem = 100
     val sizeOfRecord = 5
-    val aepArray = new AEPBytesArray(sizeOfItem, sizeOfRecord)
+    val aepArray = new OffHeapBytesArray(sizeOfItem, sizeOfRecord)
     val targetArray = ArrayBuffer[Byte]()
     val rec = Array[Byte](193.toByte, 169.toByte, 0, 90, 4)
     (0 until 100).foreach {i =>
@@ -82,7 +81,7 @@ class AEPSpec extends ZooSpecHelper {
   }
 
   "AEPvarBytesArray" should "be ok" in {
-    val aepArray = new AEPVarBytesArray(3, 5 + 2 + 6)
+    val aepArray = new OffHeapVarBytesArray(3, 5 + 2 + 6)
     val targetArray = ArrayBuffer[Byte]()
     val rec1 = Array[Byte](193.toByte, 169.toByte, 0, 90, 4)
     val rec2 = Array[Byte](90, 4)

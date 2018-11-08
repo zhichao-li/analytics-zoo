@@ -12,24 +12,19 @@
 #include <string>
 #include <iostream>
 
-#include "com_intel_analytics_zoo_aep_AEPHandler.h"
+#include "com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator.h"
 using namespace std;
 
 
-//using memkind = struct memkind;
-//memkind *pmemkind = NULL;
-
 struct memkind *pmem_kind;
 
-#define PMEM_MAX_SIZE ((size_t)1024 * 1024 * 1024 * 128)
-
 /*
- * Class:     com_intel_analytics_zoo_aep_AEPHandler
+ * Class:     com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator
  * Method:    initialize
  * Signature: (Ljava/lang/String;J)V
  */
-JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_initialize
-  (JNIEnv *env, jclass, jstring path, jlong size) {
+JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator_initialize
+  (JNIEnv *env, jobject, jstring path, jlong size) {
     const char* str = env->GetStringUTFChars(path, NULL);
     if (NULL == str) {
       throw std::invalid_argument("Initial path can't be NULL.\n");
@@ -53,12 +48,12 @@ JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_initialize
   }
 
 /*
- * Class:     com_intel_analytics_zoo_aep_AEPHandler
+ * Class:     com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator
  * Method:    allocate
  * Signature: (J)J
  */
-JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_allocate
-  (JNIEnv *, jclass, jlong size) {
+JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator_allocate
+(JNIEnv *, jobject, jlong size) {
 //    void* ptr = (void*) malloc(size);
 //    return (jlong)ptr;
   if (NULL == pmem_kind) {
@@ -73,12 +68,12 @@ JNIEXPORT jlong JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_allocate
   }
 
 /*
- * Class:     com_intel_analytics_zoo_aep_AEPHandler
+ * Class:     com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator
  * Method:    free
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_free
-  (JNIEnv *, jclass, jlong addr) {
+JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator_free
+  (JNIEnv *,  jobject, jlong addr) {
 //  free((void *)addr);
   if (NULL == pmem_kind) {
     throw std::invalid_argument("We should init the AEP memory first.\n");
@@ -88,11 +83,11 @@ JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_free
   }
 
 /*
- * Class:     com_intel_analytics_zoo_aep_AEPHandler
+ * Class:     com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator
  * Method:    copy
  * Signature: (JJJ)V
  */
-JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_aep_AEPHandler_copy
-  (JNIEnv *, jclass, jlong dest, jlong src, jlong size) {
+JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator_copy
+  (JNIEnv *, jobject, jlong dest, jlong src, jlong size) {
     memcpy((void *)dest, (void *)src, size);
  }

@@ -1,17 +1,17 @@
 
-package com.intel.analytics.zoo.aep
+package com.intel.analytics.zoo.persistent.memory
 
 import org.apache.spark.unsafe.Platform
 
-object AEPFloatArray {
+object OptaneDCFloatArray {
 
   def getTotalBytes(size: Long): Long = {
     size * 4
   }
   val MOVE_STEPS = 4
 
-  def apply(iterator: Iterator[Float], numOfRecord: Int): AEPFloatArray = {
-    val aepArray = new AEPFloatArray(numOfRecord)
+  def apply(iterator: Iterator[Float], numOfRecord: Int): OffHeapFloatArray = {
+    val aepArray = new OffHeapFloatArray(numOfRecord)
     var i = 0
     while(iterator.hasNext) {
       aepArray.set(i, iterator.next())
@@ -24,15 +24,15 @@ object AEPFloatArray {
   * An float array with fixed size stored in AEP.
   * @param recordNum number of item for this array.
   */
-class AEPFloatArray(val recordNum: Int) extends AEPArray[Float](
-  recordNum * AEPFloatArray.MOVE_STEPS) {
+class OffHeapFloatArray(val recordNum: Int, memoryType: MemoryType = OptaneDC) extends OffHeapArray[Float](
+  recordNum * OptaneDCFloatArray.MOVE_STEPS, memoryType) {
 
   override  def get(i: Int): Float = {
     assert(!deleted)
     Platform.getFloat(null, indexOf(i))
   }
 
-  def getMoveSteps(): Int = AEPFloatArray.MOVE_STEPS
+  def getMoveSteps(): Int = OptaneDCFloatArray.MOVE_STEPS
 
   def set(i: Int, value: Float): Unit = {
     assert(!deleted)
@@ -40,7 +40,7 @@ class AEPFloatArray(val recordNum: Int) extends AEPArray[Float](
   }
 
   protected def indexOf(i: Int): Long = {
-    val index = startAddr + (i * AEPFloatArray.MOVE_STEPS)
+    val index = startAddr + (i * OptaneDCFloatArray.MOVE_STEPS)
     assert(index <= lastOffSet)
     index
   }

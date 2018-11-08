@@ -16,24 +16,20 @@
 
 package com.intel.analytics.zoo.feature.image
 
-import java.io.{FileOutputStream, ObjectOutputStream}
 import java.nio.ByteBuffer
-import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
+import java.util.concurrent.atomic.AtomicInteger
 
 import com.intel.analytics.bigdl.DataSet
-import com.intel.analytics.bigdl.dataset.{ByteRecord, CachedDistriDataSet, DataSet, DistributedDataSet}
+import com.intel.analytics.bigdl.dataset.{ByteRecord, DataSet, DistributedDataSet}
 import com.intel.analytics.bigdl.transform.vision.image.{DistributedImageFrame, ImageFeature, ImageFrame, LocalImageFrame}
-import com.intel.analytics.bigdl.utils.{Engine, RandomGenerator}
-import com.intel.analytics.zoo.aep.{AEPBytesArray, AEPVarBytesArray}
+import com.intel.analytics.bigdl.utils.RandomGenerator
 import com.intel.analytics.zoo.common.Utils
 import com.intel.analytics.zoo.feature.common.Preprocessing
-import com.intel.analytics.zoo.pipeline.api.keras.layers.utils.{EngineRef, KerasUtils}
-import com.sun.jndi.cosnaming.IiopUrl.Address
+import com.intel.analytics.zoo.persistent.memory.OffHeapVarBytesArray
+import com.intel.analytics.zoo.pipeline.api.keras.layers.utils.EngineRef
 import org.apache.commons.io.FileUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sparkExtension.SparkExtension
-import org.apache.spark.storage.{BlockId, BlockManagerWrapper, StorageLevel}
 import org.opencv.imgcodecs.Imgcodecs
 
 import scala.collection.mutable.ArrayBuffer
@@ -134,7 +130,7 @@ abstract class ArrayLike[T: ClassTag] extends Serializable {
   def apply(i: Int): T = throw new Error()
 }
 
-case class AEPImageArray(imgs: AEPVarBytesArray, label: Array[Float]) extends ArrayLike[ByteRecord] {
+case class AEPImageArray(imgs: OffHeapVarBytesArray, label: Array[Float]) extends ArrayLike[ByteRecord] {
   override def length: Int = {
     imgs.recordNum
   }
@@ -330,7 +326,7 @@ object ImageSet {
     }
     val result = coaleasedRdd.zipPartitions(countPerPartition){(dataIter, countIter) => {
       val count = countIter.next()
-      val aepArray = new AEPVarBytesArray(count._1, count._2)
+      val aepArray = new OffHeapVarBytesArray(count._1, count._2)
       val labelBuffer = ArrayBuffer[Float]()
       var i = 0
       while(dataIter.hasNext) {
