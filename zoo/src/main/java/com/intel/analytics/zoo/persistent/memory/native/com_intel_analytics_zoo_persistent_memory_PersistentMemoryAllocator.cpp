@@ -24,18 +24,17 @@ struct memkind *pmem_kind;
  * Signature: (Ljava/lang/String;J)V
  */
 JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_persistent_memory_PersistentMemoryAllocator_initialize
-  (JNIEnv *env, jobject, jstring path, jlong size) {
-    const char* str = env->GetStringUTFChars(path, NULL);
-    if (NULL == str) {
+  (JNIEnv *env, jobject, jstring jpath, jlong size) {
+    const char* path = env->GetStringUTFChars(jpath, NULL);
+    if (NULL == path) {
       throw std::invalid_argument("Initial path can't be NULL.\n");
     }
-    std::cout<<str<<"\n";
-    std::cout<<size<<"\n";
+    std::cout<<"persistent memory path: " << path << "\n";
+    std::cout<<"request size: " << size << "\n";
 
     size_t sz = (size_t)size;
-    int error = memkind_create_pmem("/mnt/pmem0", sz, &pmem_kind);
+    int error = memkind_create_pmem(path, sz, &pmem_kind);
 
-//    int error = memkind_create_pmem("/mnt/pmem0", PMEM_MAX_SIZE, &pmem_kind);
     if (error) {
     std::stringstream ss;
     char msg[200];
@@ -44,7 +43,7 @@ JNIEXPORT void JNICALL Java_com_intel_analytics_zoo_persistent_memory_Persistent
     throw std::runtime_error(ss.str());
     }
 
-    env->ReleaseStringUTFChars(path, str);
+    env->ReleaseStringUTFChars(jpath, path);
   }
 
 /*

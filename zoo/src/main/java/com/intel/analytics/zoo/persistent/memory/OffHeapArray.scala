@@ -15,8 +15,10 @@ case object DRAM extends MemoryType
 abstract class OffHeapArray[T](totalBytes: Long, memoryType: MemoryType) {
 
   val startAddr: Long = if (memoryType == OptaneDC) {
-    PersistentMemoryAllocator.allocate(totalBytes)
+    println("Using persistent memory")
+    PersistentMemoryStore.allocate(totalBytes)
   } else {
+    println("Using main memory")
     Platform.allocateMemory(totalBytes)
   }
 

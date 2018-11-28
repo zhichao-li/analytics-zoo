@@ -16,15 +16,12 @@
 
 package com.intel.analytics.zoo.pipeline.aep
 
-import com.intel.analytics.bigdl.dataset.image.{HFlip, _}
-import com.intel.analytics.bigdl.dataset.{ByteRecord, DataSet, DistributedDataSet, MiniBatch}
+import com.intel.analytics.bigdl.dataset.{DistributedDataSet, MiniBatch}
 import com.intel.analytics.bigdl.utils.Engine
 import com.intel.analytics.zoo.common.NNContext
-import com.intel.analytics.zoo.feature.image.ImageSet
 import com.intel.analytics.zoo.models.image.inception.ImageNet2012
 import com.intel.analytics.zoo.persistent.memory._
 import com.intel.analytics.zoo.pipeline.api.keras.ZooSpecHelper
-import org.apache.hadoop.io.Text
 import org.apache.spark.SparkContext
 
 import scala.collection.mutable.ArrayBuffer
@@ -36,7 +33,6 @@ class PersistentMemorySpec extends ZooSpecHelper {
     val conf = Engine.createSparkConf().setAppName("PersistentMemorySpec")
       .set("spark.task.maxFailures", "1").setMaster("local[4]")
     sc = NNContext.initNNContext(conf)
-    PersistentMemoryAllocator.allocate(1024* 1024 * 1000)
   }
 
   override def doAfter(): Unit = {
@@ -45,10 +41,10 @@ class PersistentMemorySpec extends ZooSpecHelper {
     }
   }
 
-  "load native lib" should "be ok" in {
-    val address = PersistentMemoryAllocator.allocate(1000L)
-    PersistentMemoryAllocator.free(address)
-  }
+//  "load native lib" should "be ok" in {
+//    val address = PersistentMemoryStore.allocate(1000L)
+//    PersistentMemoryAllocator.free(address)
+//  }
 
   "AEPFloatArray" should "be ok" in {
     val array = Array[Float](1.2f, 0.3f, 4.5f, 199999.6f)
@@ -75,7 +71,6 @@ class PersistentMemorySpec extends ZooSpecHelper {
     while( i < sizeOfItem) {
       assert(aepArray.get(i) === rec)
       i += 1
-      println(i)
     }
     aepArray.free()
   }
@@ -110,4 +105,18 @@ class PersistentMemorySpec extends ZooSpecHelper {
     assert(data.count() == 3)
     data.collect()
   }
+
+//  "sss" should "be ok" in {
+//    val imagenet = com.intel.analytics.zoo.models.image.inception.ImageNet2012(
+//      path = "/opt/work/zhichao/image-noresize-small/train"
+//      sc = sc,
+//      imageSize = 224,
+//      batchSize = 256,
+//      nodeNumber = 1,
+//      coresPerNode = 4,
+//      classNumber = 1000,
+//      cacheWithAEP = true
+//    )
+//
+//  }
 }
