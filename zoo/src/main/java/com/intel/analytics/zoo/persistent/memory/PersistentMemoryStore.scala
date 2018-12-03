@@ -5,7 +5,7 @@ import org.apache.spark.SparkEnv
 object PersistentMemoryStore {
   // TODO: Maybe we can use docker to combine the numa socket and persistent memory.
   // TODO: Passing the path as a parameter via sparkconf?
-  val memPaths = List("/dev/dax0.0", "/dev/dax1.0")
+  val memPaths = List("/mnt/pmem0", "/mnt/pmem1")
   val memSizePerByte = 248 * 1024 * 1024 * 1024
   // TODO: There might be problem if we have executorID 2 and 4 in the same machine
   val pathIndex = executorID % memPaths.length
