@@ -1,16 +1,28 @@
 package com.intel.analytics.zoo.persistent.memory;
 
 public class PersistentMemoryAllocator {
+    private static volatile PersistentMemoryAllocator instance;
 
-    static {
+    private PersistentMemoryAllocator() {
         new com.intel.analytics.zoo.persistent.memory.NativeLoader().init();
     }
 
-    public static native void initialize(String path, long size);
+    public static PersistentMemoryAllocator getInstance() {
+        if (instance == null) {
+            synchronized (PersistentMemoryAllocator.class) {
+                if (instance == null) {
+                    instance = new PersistentMemoryAllocator();
+                }
+            }
+        }
+        return instance;
+    }
 
-    public static native long allocate(long size);
+    public native void initialize(String path, long size);
 
-    public static native void free(long address);
+    public native long allocate(long size);
 
-    public static native void copy(long destAddress, long srcAddress, long size);
+    public native void free(long address);
+
+    public native void copy(long destAddress, long srcAddress, long size);
 }

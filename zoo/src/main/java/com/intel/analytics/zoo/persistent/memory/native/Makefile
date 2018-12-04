@@ -21,4 +21,4 @@ clean:
 		rm -rf $(TARGET_DIR)
 
 # cd zoo/target/classes
-# javah -d zoo/src/main/java/com/intel/analytics/zoo/aep com.intel.analytics.zoo.persistent.memory.PersistentMemoryAllocator
+# javah -d zoo/src/main/java/com/intel/analytics/zoo/persistent/memory/native/ com.intel.analytics.zoo.persistent.memory.PersistentMemoryAllocator

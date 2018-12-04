@@ -36,7 +36,7 @@ abstract class OffHeapArray[T](totalBytes: Long, memoryType: MemoryType) {
   def free(): Unit = {
     if (!deleted) {
       if (memoryType == OptaneDC) {
-        PersistentMemoryAllocator.free(startAddr)
+        PersistentMemoryStore.free(startAddr)
       } else {
         Platform.freeMemory(startAddr)
       }
