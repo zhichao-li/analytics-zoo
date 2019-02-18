@@ -20,7 +20,7 @@ class Mnist:
             ray.init(master_addr)
             # big ndarray sample
             big_ndarray = np.stack([i for i in iterator], axis=0)
-            yield (splitIndex, ray.put(big_ndarray))  # performance?
+            yield ray.put(big_ndarray)  #(splitIndex, ray.put(big_ndarray))  # performance?
 
         return x_rdd_ndarray.mapPartitionsWithIndex(f).collect()
 
@@ -48,13 +48,6 @@ class Mnist:
         #         self.grads = optimizer.compute_gradients(self.loss)
         #         self.train = optimizer.apply_gradients(self.grads)
         # Define the weight initializer and session.
-        self.train_op = tf.train.AdamOptimizer().minimize(self.loss)
-        init = tf.global_variables_initializer()
-        self.sess = tf.Session()
-        #         # Additional code for setting and getting the weights
-        self.variables = ray.experimental.TensorFlowVariables(self.loss, self.sess)
-        #         # Return all of the data needed to use the network.
-        self.sess.run(init)
 
     def build_dataset(self, x, y, batch_size, train=True):
         num_samples = x.shape[0] - x.shape[0] % batch_size
@@ -75,9 +68,29 @@ class Mnist:
 
 
 # mnist.sess.run(mnist.train, feed_dict={i: d for i, d in zip(mnist.inputs, [x_train, y_train])})
-# mnist = Mnist(x_train[:100], y_train[:100])
-# mnist.train()
-# mnist.variables.get_weights()
+x_train, y_train, x_test, y_test = Mnist.get_mnist_data()
+mnist = Mnist(x_train[:100], y_train[:100])
+# # mnist.train()
+# weights = mnist.variables.get_weights()
+# ray_master = "10.239.10.105:44876"
+# import ray
+# ray.shutdown()
+# ray.init(ray_master)
+# wid = ray.put(weights)
+# wfr = ray.get(wid)
+# weights
+
+# optimizer = tf.train.AdamOptimizer()
+# grads_ops = optimizer.compute_gradients(mnist.loss)
+# train_op = optimizer.apply_gradients(grads_ops)
+# # self.train_op = tf.train.AdamOptimizer().minimize(self.loss)
+# init = tf.global_variables_initializer()
+# sess = tf.Session()
+# # Additional code for setting and getting the weights
+# variables = ray.experimental.TensorFlowVariables(mnist.loss, sess)
+# sess.run(init)
+# result = sess.run([grads_op[0] for grads_op in grads_ops] + [mnist.loss])
+# result
 
 
 
