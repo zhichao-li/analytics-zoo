@@ -86,6 +86,16 @@ def forward_stream(src_fd, dst_stream):
             dst_stream.flush()
 
 
+# chao: simple
+def simple_execute(command, env=None, stdout=None, stderr=None):
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        env=env,
+        cwd=None,
+        stdout=stdout,
+        stderr=stderr)
+
 def execute(command, env=None, stdout=None, stderr=None):
     # Make a pipe for the subprocess stdout/stderr.
     (stdout_r, stdout_w) = os.pipe()

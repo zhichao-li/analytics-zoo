@@ -21,7 +21,7 @@ import time
 print(pyspark.__file__)
 from pyspark import *
 from pyspark.sql import SparkSession
-from zoo.common.ray_poc.util.safe_shell_exec import get_ip_address
+from zoo.common.ray_poc.util.safe_shell_exec import get_ip_address, simple_execute
 from zoo.common.ray_poc.util.safe_shell_exec import execute
 
 def ray_poc():
@@ -81,23 +81,26 @@ def ray_poc():
         RAY_COMMAND = get_ray_command_path()
 
         # clean the env first
-        execute("{} stop".format(RAY_COMMAND))
+        simple_execute("{} stop".format(RAY_COMMAND))
         time.sleep(5)
 
         def start_raylet():
             redis_address = "{}:{}".format(master_ip, REDIS_PORT)
-            command = "{} start --redis-address {}".format(RAY_COMMAND, redis_address)
+            command = "nohup {} start --redis-address {} --redis-password 123456".format(RAY_COMMAND, redis_address)
             print(command)
-            execute(command)
+            simple_execute(command)
 
         if tc.partitionId() == 0:
             print("working dir: {}".format(os.getcwd()))
-            command = "{} start --head --redis-port {}".format(RAY_COMMAND, REDIS_PORT)
+            command = "nohup {} start --head --redis-port {} --redis-password 123456".format(RAY_COMMAND, REDIS_PORT)
             print(command)
             # TODO redis port should be randomly searched
-            execute(command)
+            simple_execute(command)
+            time.sleep(5)
         else:
+            print("partition id is : {}".format(tc.partitionId()))
             start_raylet()
+            time.sleep(5)
 
         yield []
 
