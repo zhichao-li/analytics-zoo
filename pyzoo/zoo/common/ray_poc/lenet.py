@@ -26,7 +26,7 @@ class Mnist:
 
 
     def __init__(self, x_train, y_train):
-        images, labels = self.build_dataset(x_train, y_train, 32)
+        images, labels = Mnist.build_dataset(x_train, y_train, 32)
         input1 = tf.keras.layers.Flatten(input_shape=(28, 28))(images)
         dense = tf.keras.layers.Dense(512, activation=tf.nn.relu)(input1)
         dropout = tf.keras.layers.Dropout(0.2)(dense)
@@ -48,12 +48,12 @@ class Mnist:
         #         self.grads = optimizer.compute_gradients(self.loss)
         #         self.train = optimizer.apply_gradients(self.grads)
         # Define the weight initializer and session.
-
-    def build_dataset(self, x, y, batch_size, train=True):
+    @staticmethod
+    def build_dataset(x, y, batch_size, train=True):
         num_samples = x.shape[0] - x.shape[0] % batch_size
         dataset = tf.data.Dataset.from_tensor_slices((x[:num_samples], y[:num_samples]))
         dataset = dataset.batch(batch_size)
-        dataset = dataset.repeat()
+        #dataset = dataset.repeat()
         if train:
             dataset.shuffle(buffer_size=16 * batch_size)
         images, labels = dataset.make_one_shot_iterator().get_next()
