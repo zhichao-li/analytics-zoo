@@ -34,16 +34,27 @@ def start_driver_code():
              redis_password="123456")
     print("after init")
 
-    @ray.remote
-    def remote_aaa():
-        return 1
-
-    result = remote_aaa.remote()
+    # @ray.remote
+    # def remote_aaa():
+    #     return 1
+    #
+    # result = remote_aaa.remote()
     print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
-    ray.put("I'm here")
-    print(result)
+    try:
+        ray.put("I'm here")
+    except :
+        print("bad boy")
+    finally:
+        print("finally here")
+
+    import sys
+    sys.stdout.flush()
+
+    time.sleep(100000)
+    # print(result)
 
 def driver_func(_):
+    start_driver_code()
     master_file = "master.created"
     if (not os.path.isfile(master_file)):
         print("creating master file")
@@ -58,7 +69,7 @@ def driver_func(_):
         print("empty action")
         yield []
 
-    time.sleep(1000000)
+    # time.sleep(1000000)
 
 
 
