@@ -23,12 +23,29 @@ from pyspark import *
 from pyspark.sql import SparkSession
 from zoo.common.ray_poc.util.safe_shell_exec import get_ip_address, simple_execute
 from zoo.common.ray_poc.util.safe_shell_exec import execute
+import ray
+
+def driver_func():
+    print("before init")
+    # import ray
+    # ray.init(redis_address="{}:{}".format(master_ip, redis_port),
+    #          redis_password="123456")
+    # print("after init")
+    #
+    @ray.remote
+    def remote_aaa():
+        return 1
+
+    result = remote_aaa.remote()
+    print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+    ray.put("I'm here")
+    print(result)
+    yield []
 
 
 def ray_poc():
 
     # TypeError: __init__() got an unexpected keyword argument 'auth_token' <- pip install pyspark==2.4.0 solved.
-
     # spark_conf = SparkConf().setMaster("local[4]").set("spark.driver.memory", "2g")
     spark = SparkSession.builder.master("local[4]").config(key="spark.driver.memory", value="4g").getOrCreate()
     sc = spark.sparkContext
@@ -66,6 +83,16 @@ def ray_poc():
         python_loc = os.environ['PYSPARK_PYTHON']
         return "{}/ray".format("/".join(python_loc.split("/")[:-1]))
 
+
+    # Create a driver and execute something here.
+
+    # def start_driver_service():
+    #
+    #         yield result
+
+
+
+
     def start_ray_service(iter):
         # TODO: how can we get the ip:port within a task?
         tc = BarrierTaskContext.get()
@@ -100,11 +127,38 @@ def ray_poc():
             # TODO redis port should be randomly searched
             simple_execute(command)
             time.sleep(5)
-            yield task_addrs[0]
+            # yield task_addrs[0]
         else:
             print("partition id is : {}".format(tc.partitionId()))
             start_raylet()
             time.sleep(5)
+
+        tc.barrier()
+
+        tc = BarrierTaskContext.get()
+        RAY_COMMAND = get_ray_command_path()
+        task_addrs = [taskInfo.address for taskInfo in tc.getTaskInfos()]
+        print("driver_service")
+        print(task_addrs)
+        if tc.partitionId() == 0:
+            # we are at the master executor
+            print("working dir: {}".format(os.getcwd()))
+            print("Starting the driver process for ray")
+            # driver_func(master_ip, REDIS_PORT)
+            import ray
+            ray.init(redis_address="{}:{}".format(master_ip, REDIS_PORT),
+                     redis_password="123456")
+            print("after init")
+
+            driver_func()
+            print("end of driver")
+            yield []
+
+
+        tc.barrier()
+
+        yield []
+
 
 
 
@@ -116,35 +170,15 @@ def ray_poc():
     # sc.setLocalProperty("redis_ip", ips[0])
     # sc.setLocalProperty("redis_port", REDIS_PORT)
 
-    redis_host_address = sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(start_ray_service).collect()
-    assert len(redis_host_address) == 1, "we should only create 1 redis"
-    redis_host_address = redis_host_address[0]
+    sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(start_ray_service).collect()
+    # assert len(redis_host_address) == 1, "we should only create 1 redis"
+    # redis_host_address = redis_host_address[0]
 
     # procs = sc.range(0, 1).barrier().mapPartitions(start_master).map(lambda _: )
     # result = procs.mapPartitionsWithIndex(start_master).collect()
     # ips
 
-    # Create a driver and execute something here.
 
-    def start_driver_service(iter):
-        tc = BarrierTaskContext.get()
-        RAY_COMMAND = get_ray_command_path()
-        task_addrs = [taskInfo.address for taskInfo in tc.getTaskInfos()]
-        if task_addrs[tc.partitionId()] == redis_host_address:
-            # we are at the master executor
-            print("working dir: {}".format(os.getcwd()))
-            print("Starting the driver process for ray")
-
-            import ray
-            print("###redis address: " + redis_host_address.split(":")[0])
-            ray.init("{}:{}".format((redis_host_address.split(":")[0], REDIS_PORT)))
-
-            @ray.remote
-            def remote_function():
-                return 1
-
-            result = [ray.get(remote_function.remote()) for i in range(0, NUM_WORKERS)]
-            yield result
 
 
     result = sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(start_driver_service).collect()
