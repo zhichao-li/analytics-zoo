@@ -24,6 +24,7 @@ from pyspark.sql import SparkSession
 from zoo.common.ray_poc.util.safe_shell_exec import get_ip_address, simple_execute
 from zoo.common.ray_poc.util.safe_shell_exec import execute
 
+
 def ray_poc():
 
     # TypeError: __init__() got an unexpected keyword argument 'auth_token' <- pip install pyspark==2.4.0 solved.
@@ -71,6 +72,8 @@ def ray_poc():
         # The address is sorted by partitionId according to the comments
         # Partition 0 is the Master
         task_addrs = [taskInfo.address for taskInfo in tc.getTaskInfos()]
+        print("$$$$$$")
+        print(task_addrs)
         master_ip = task_addrs[0].split(":")[0]
 
         print("current_address {}".format(task_addrs[tc.partitionId()]))
@@ -97,12 +100,13 @@ def ray_poc():
             # TODO redis port should be randomly searched
             simple_execute(command)
             time.sleep(5)
+            yield task_addrs[0]
         else:
             print("partition id is : {}".format(tc.partitionId()))
             start_raylet()
             time.sleep(5)
 
-        yield []
+
 
     NUM_WORKERS = 1
     REDIS_PORT = "5347"
@@ -112,16 +116,49 @@ def ray_poc():
     # sc.setLocalProperty("redis_ip", ips[0])
     # sc.setLocalProperty("redis_port", REDIS_PORT)
 
-    sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(start_ray_service).collect()
+    redis_host_address = sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(start_ray_service).collect()
+    assert len(redis_host_address) == 1, "we should only create 1 redis"
+    redis_host_address = redis_host_address[0]
 
     # procs = sc.range(0, 1).barrier().mapPartitions(start_master).map(lambda _: )
     # result = procs.mapPartitionsWithIndex(start_master).collect()
     # ips
 
+    # Create a driver and execute something here.
+
+    def start_driver_service(iter):
+        tc = BarrierTaskContext.get()
+        RAY_COMMAND = get_ray_command_path()
+        task_addrs = [taskInfo.address for taskInfo in tc.getTaskInfos()]
+        if task_addrs[tc.partitionId()] == redis_host_address:
+            # we are at the master executor
+            print("working dir: {}".format(os.getcwd()))
+            print("Starting the driver process for ray")
+
+            import ray
+            print("###redis address: " + redis_host_address.split(":")[0])
+            ray.init("{}:{}".format((redis_host_address.split(":")[0], REDIS_PORT)))
+
+            @ray.remote
+            def remote_function():
+                return 1
+
+            result = [ray.get(remote_function.remote()) for i in range(0, NUM_WORKERS)]
+            yield result
+
+
+    result = sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(start_driver_service).collect()
+
+    result
+
+
 
 
     # TODO: register cleaner for each partition
-
+    # def cleaner(_):
+    #     simple_execute("{} stop".format(get_ray_command_path()))
+    # sc.range(0, NUM_WORKERS + 1, numSlices=NUM_WORKERS + 1).barrier().mapPartitions(
+    #     cleaner).collect()
 ray_poc()
 
 
