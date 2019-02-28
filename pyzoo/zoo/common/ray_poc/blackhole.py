@@ -1,11 +1,11 @@
 # cleaner
-# def cleaner(_):
-#     try:
-#         os.remove(os.path.join(os.getcwd(), master_file))
-#     except OSError:
-#         pass
-#     yield []
-#
+def cleaner(_):
+    try:
+        os.remove(os.path.join(os.getcwd(), master_file))
+    except OSError:
+        pass
+    yield []
+
 # sc.range(0, NUM_WORKERS + 1, numSlices=NUM_WORKERS + 1).barrier().mapPartitions(
 #     cleaner).collect()
 

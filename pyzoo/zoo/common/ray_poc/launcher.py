@@ -25,13 +25,15 @@ from zoo.common.ray_poc.util.safe_shell_exec import get_ip_address, simple_execu
 from zoo.common.ray_poc.util.safe_shell_exec import execute
 import ray
 
-def driver_func():
+
+def start_driver_code():
     print("before init")
-    # import ray
-    # ray.init(redis_address="{}:{}".format(master_ip, redis_port),
-    #          redis_password="123456")
-    # print("after init")
-    #
+    redis_addr = "10.239.10.105:5347"
+    import ray
+    ray.init(redis_address=redis_addr,
+             redis_password="123456")
+    print("after init")
+
     @ray.remote
     def remote_aaa():
         return 1
@@ -40,7 +42,25 @@ def driver_func():
     print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
     ray.put("I'm here")
     print(result)
-    yield []
+
+def driver_func(_):
+    master_file = "master.created"
+    if (not os.path.isfile(master_file)):
+        print("creating master file")
+        with open(os.path.join(os.getcwd(), master_file), 'w') as f:
+            f.write('master is created.')
+            f.close()
+        print("create master file")
+        start_driver_code()
+
+        yield []
+    else:
+        print("empty action")
+        yield []
+
+    time.sleep(1000000)
+
+
 
 
 def ray_poc():
@@ -135,27 +155,27 @@ def ray_poc():
 
         tc.barrier()
 
-        tc = BarrierTaskContext.get()
-        RAY_COMMAND = get_ray_command_path()
-        task_addrs = [taskInfo.address for taskInfo in tc.getTaskInfos()]
-        print("driver_service")
-        print(task_addrs)
-        if tc.partitionId() == 0:
-            # we are at the master executor
-            print("working dir: {}".format(os.getcwd()))
-            print("Starting the driver process for ray")
-            # driver_func(master_ip, REDIS_PORT)
-            import ray
-            ray.init(redis_address="{}:{}".format(master_ip, REDIS_PORT),
-                     redis_password="123456")
-            print("after init")
-
-            driver_func()
-            print("end of driver")
-            yield []
-
-
-        tc.barrier()
+        # tc = BarrierTaskContext.get()
+        # RAY_COMMAND = get_ray_command_path()
+        # task_addrs = [taskInfo.address for taskInfo in tc.getTaskInfos()]
+        # print("driver_service")
+        # print(task_addrs)
+        # if tc.partitionId() == 0:
+        #     # we are at the master executor
+        #     print("working dir: {}".format(os.getcwd()))
+        #     print("Starting the driver process for ray")
+        #     # driver_func(master_ip, REDIS_PORT)
+        #     import ray
+        #     ray.init(redis_address="{}:{}".format(master_ip, REDIS_PORT),
+        #              redis_password="123456")
+        #     print("after init")
+        #
+        #     driver_func()
+        #     print("end of driver")
+        #     yield []
+        #
+        #
+        # tc.barrier()
 
         yield []
 
@@ -181,7 +201,7 @@ def ray_poc():
 
 
 
-    result = sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(start_driver_service).collect()
+    result = sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(driver_func).collect()
 
     result
 
