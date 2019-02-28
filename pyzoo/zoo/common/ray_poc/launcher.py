@@ -26,6 +26,10 @@ from zoo.common.ray_poc.util.safe_shell_exec import execute
 import ray
 
 
+@ray.remote
+def remote_aaa():
+    return 1
+
 def start_driver_code():
     print("before init")
     redis_addr = "10.239.10.105:5347"
@@ -34,12 +38,11 @@ def start_driver_code():
              redis_password="123456")
     print("after init")
 
-    # @ray.remote
-    # def remote_aaa():
-    #     return 1
-    #
-    # result = remote_aaa.remote()
+    result = remote_aaa.remote()
+    # time.sleep(100)
+
     print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+    print("hi" + str(ray.get(result)))
     try:
         ray.put("I'm here")
     except :
@@ -212,9 +215,11 @@ def ray_poc():
 
 
 
-    result = sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(driver_func).collect()
+    # result = sc.range(0, NUM_WORKERS + 1, numSlices = NUM_WORKERS + 1).barrier().mapPartitions(driver_func).collect()
 
-    result
+    # result
+
+    start_driver_code()
 
 
 
