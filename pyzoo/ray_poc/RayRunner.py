@@ -12,10 +12,10 @@ class RayRunner(object):
         self.redis_port = redis_port
         self.password = password
 
-    def __getstate__(self):
-        state = dict(self.__dict__)
-        del state['sc']
-        return state
+    # def __getstate__(self):
+    #     state = dict(self.__dict__)
+    #     del state['sc']
+    #     return state
 
     # how many executors?
 
@@ -24,30 +24,37 @@ class RayRunner(object):
 
     def run(self):
         num_executors = self.get_num_executors()
-        redis_address = self.sc.range(0, num_executors + 1,
-                              numSlices=num_executors + 1).barrier().mapPartitions(self._start_ray_services).collect()
+        redis_address = self.sc.range(0,
+                                      num_executors + 1,
+                                      numSlices=num_executors + 1).barrier().mapPartitions(
+            self._gen_ray_booter(redis_port=self.redis_port, python_loc=self.python_loc,
+                                 password=self.password,
+                                 num_cores=self.spark_runtime_conf.get(
+                                     "spark.executor.cores"))).collect()
         return redis_address
 
-
-    def start_master(self, redis_port):
+    @staticmethod
+    def start_master(redis_port, password, num_cores, python_loc):
         """
         Start the Master for Ray
         :return:
         """
-        command = "nohup {} start --head --redis-port {} --redis-password {} --num-cpus {}".format(self.get_ray_exec(), redis_port, self.password, self.spark_runtime_conf.get("spark.executor.cores"))
+        command = "nohup {} start --head --redis-port {} --redis-password {} --num-cpus {}".format(RayRunner.get_ray_exec(python_loc), redis_port, password, num_cores)
         print("Starting ray master by running {}".format(command))
 
-    def start_raylet(self, redis_address):
+    @staticmethod
+    def start_raylet(redis_address, python_loc, password, num_cores):
         """
         Start the Slave for Ray
         :return:
         """
-        command = "nohup {} start --redis-address {} --redis-password  {} --num-cpus {}".format(self.get_ray_exec(), redis_address, self.password, self.spark_runtime_conf.get("spark.executor.cores"))
+        command = "nohup {} start --redis-address {} --redis-password  {} --num-cpus {}".format(RayRunner.get_ray_exec(python_loc), redis_address, password, num_cores)
         print("".format(command))
         RayRunner.simple_execute(command)
 
-    def stop_ray(self):
-        RayRunner.simple_execute("{} stop".format(self.get_ray_exec()))
+    @staticmethod
+    def stop_ray(python_loc):
+        RayRunner.simple_execute("{} stop".format(RayRunner.get_ray_exec(python_loc)))
 
     def start_driver(self):
         """
@@ -55,29 +62,36 @@ class RayRunner(object):
         :return:
         """
 
-    def get_ray_exec(self):
-        python_bin_dir = "/".join(self.python_loc.split("/")[:-1])
+    @staticmethod
+    def get_ray_exec(python_loc):
+        python_bin_dir = "/".join(python_loc.split("/")[:-1])
         return "{}/python {}/ray".format(python_bin_dir, python_bin_dir)
 
-    def _start_ray_services(self, iter):
-        tc = BarrierTaskContext.get()
-        # The address is sorted by partitionId according to the comments
-        # Partition 0 is the Master
-        task_addrs = [taskInfo.address for taskInfo in tc.getTaskInfos()]
-        print(task_addrs)
-        master_ip = task_addrs[0].split(":")[0]
-        print("current address {}".format(task_addrs[tc.partitionId()]))
-        print("master address {}".format(master_ip))
-        # clean the env first
-        self.stop_ray()
-        redis_address = "{}:{}".format(master_ip, self.redis_port)
-        if tc.partitionId() == 0:
-            self.start_master(redis_port=self.redis_port)
-            yield redis_address
-        else:
-            print("partition id is : {}".format(tc.partitionId()))
-            self.start_raylet(redis_address=redis_address)
-        tc.barrier()
+    @staticmethod
+    def _gen_ray_booter(redis_port, python_loc, password, num_cores):
+        def _start_ray_services(iter):
+            tc = BarrierTaskContext.get()
+            # The address is sorted by partitionId according to the comments
+            # Partition 0 is the Master
+            task_addrs = [taskInfo.address for taskInfo in tc.getTaskInfos()]
+            print(task_addrs)
+            master_ip = task_addrs[0].split(":")[0]
+            print("current address {}".format(task_addrs[tc.partitionId()]))
+            print("master address {}".format(master_ip))
+            # clean the env first
+            RayRunner.stop_ray(python_loc)
+            redis_address = "{}:{}".format(master_ip, redis_port)
+            if tc.partitionId() == 0:
+                RayRunner.start_master(redis_port=redis_port, password=password, num_cores=num_cores, python_loc=python_loc)
+                yield redis_address
+            else:
+                print("partition id is : {}".format(tc.partitionId()))
+                RayRunner.start_raylet(redis_address=redis_address,
+                                       python_loc=python_loc,
+                                       password=password,
+                                       num_cores=num_cores)
+            tc.barrier()
+        return _start_ray_services
 
     @staticmethod
     def simple_execute(command, env=None, stdout=None, stderr=None):
