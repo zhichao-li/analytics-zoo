@@ -1,16 +1,27 @@
+import os
 import subprocess
+import signal
+import atexit
 
-from ray_poc.util import safe_shell_exec
-
-
-def simple_execute(command, env=None, stdout=None, stderr=None, timeout=None):
-    # safe_shell_exec.execute(command=command, env=env, stdout=stdout, stderr=stderr)
-    process = subprocess.Popen(
+def session_execute(command, env=None):
+    pro = subprocess.Popen(
         command,
         shell=True,
         env=env,
         cwd=None,
-        stdout=stdout,
-        stderr=stderr)
-    print("child process id: {}".format(process.pid))
-    process.wait(timeout)
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        preexec_fn=os.setsid)
+    out, err = pro.communice()
+    errcode = pro.returncode
+
+    def _shutdown():
+        os.killpg(os.getpgid(pro.pid), signal.SIGTERM)
+    # TODO: are there any other signal we want to handle?
+    atexit.register(_shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
+    if errcode != 0:
+        # https://bip.weizmann.ac.il/course/python/PyMOTW/PyMOTW/docs/atexit/index.html
+        # http://www.pybloggers.com/2016/02/how-to-always-execute-exit-functions-in-python/    register for signal handling
+        raise Exception(err)
+    return out, err

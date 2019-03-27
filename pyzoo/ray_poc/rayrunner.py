@@ -2,9 +2,10 @@ import os
 import time
 import threading
 from pyspark import BarrierTaskContext
+import atexit
 
 
-from ray_poc.util.process import simple_execute
+from ray_poc.util.process import session_execute
 
 
 class RayContext(object):
@@ -12,7 +13,23 @@ class RayContext(object):
     This should be a pickable class.
     """
 
-    def __init__(self, python_loc, redis_port, slave_cores, master_cores, redis_max_memory,password):
+    def get_MKL_config(self, cores):
+       return {"intra_op_parallelism_threads":cores,
+       "inter_op_parallelism_threads":cores,
+       "OMP_NUM_THREADS":cores,
+       "KMP_BLOCKTIME":0,
+       "KMP_AFFINITY":"granularity = fine, verbose, compact, 1, 0",
+       "KMP_SETTINGS":0}
+
+    def prepare_env(self, cores):
+        modified_env = os.environ.copy()
+        cwd = os.getcwd()
+        modified_env["PATH"] = "{}/{}:{}".format(cwd, "/".join(self.python_loc.split("/")[:-1]), os.environ["PATH"])
+        modified_env.update(self.get_MKL_config(cores))
+        print("The command searching path is: {}".format(modified_env["PATH"]))
+
+
+    def __init__(self, python_loc, redis_port, slave_cores, master_cores, redis_max_memory, password):
         self.python_loc = python_loc
         self.redis_port = redis_port
         self.password = password
@@ -20,29 +37,26 @@ class RayContext(object):
         self.master_cores = master_cores
         self.redis_max_memory=redis_max_memory
         self.ray_exec = self.get_ray_exec()
+        self.WAITING_TIME_SEC = 5
 
     def start_master(self):
         """
         Start the Master for Ray
         :return:
         """
-        modified_env = os.environ.copy()
-        cwd = os.getcwd()
-        modified_env["PATH"] = "{}/{}:{}".format(cwd, "/".join(self.python_loc.split("/")[:-1]), os.environ["PATH"])
-        print("The command searching path is: {}".format(modified_env["PATH"]))
+
         # command = "{} start --block --head --redis-port {} --redis-password {} --num-cpus {} --redis-max-memory {}".format(
         #     self.ray_exec, self.redis_port, self.password,
         #     self.master_cores,
         # self.redis_max_memory)
-
+        modified_env = self.prepare_env(self.master_cores)
         command = "{} start --block --head --redis-port {} --redis-password {} --num-cpus {}".format(
             self.ray_exec, self.redis_port, self.password,
             self.master_cores)
 
         print("Starting ray master by running {}".format(command))
-        # simple_execute(command, env=modified_env)
-        # should be exposed as a parameter?
-        # time.sleep(15)
+        session_execute(command, env=modified_env)
+        time.sleep(self.WAITING_TIME_SEC)
 
     def start_raylet(self, redis_address):
         """
@@ -54,14 +68,16 @@ class RayContext(object):
         command = "{} start --block --redis-address {} --redis-password  {} --num-cpus {}".format(
             self.ray_exec, redis_address, self.password, self.slave_cores)
         print("".format(command))
-        # simple_execute(command)
-        # time.sleep(15)
+        modified_env = self.prepare_env(self.master_cores)
+        session_execute(command, env=modified_env)
+        time.sleep(self.WAITING_TIME_SEC)
 
     def stop_ray(self):
         command="{} stop".format(self.ray_exec)
         print("cleaning the ray cluster: {}".format(command))
-        simple_execute(command)
-        # time.sleep(5)
+        modified_env = self.prepare_env(self.master_cores)
+        session_execute(command, env=modified_env)
+        time.sleep(self.WAITING_TIME_SEC)
 
     def get_ray_exec(self):
         python_bin_dir = "/".join(self.python_loc.split("/")[:-1])
@@ -112,7 +128,6 @@ class RayRunner(object):
                                       redis_max_memory=self.redis_max_memory,
                                       password=password)
 
-
     def get_num_executors(self):
         return int(self.sc._conf.get("spark.executor.instances"))
 
@@ -122,10 +137,7 @@ class RayRunner(object):
         # ray_launching_thread.start()
         return self._run()
 
-
     def _run(self):
-        # This should be run into a separated thread,
-        # and its child processes should kill themselves if the parent dies.
         redis_address = self.sc.range(0,
                                       self.num_executors,
                                       numSlices=self.num_executors).barrier().mapPartitions(
