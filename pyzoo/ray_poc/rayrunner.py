@@ -3,6 +3,7 @@ import time
 import threading
 from pyspark import BarrierTaskContext
 import atexit
+import re
 
 
 from ray_poc.util.process import session_execute
@@ -50,7 +51,7 @@ class RayContext(object):
         #     self.master_cores,
         # self.redis_max_memory)
         modified_env = self.prepare_env(self.master_cores)
-        command = "{} start --block --head --redis-port {} --redis-password {} --num-cpus {}".format(
+        command = "{} start --head --redis-port {} --redis-password {} --num-cpus {}".format(
             self.ray_exec, self.redis_port, self.password,
             self.master_cores)
 
@@ -65,7 +66,7 @@ class RayContext(object):
         """
         # command = "{} start --block --redis-address {} --redis-password  {} --num-cpus {} --redis-max-memory {}".format(
         #     self.ray_exec, redis_address, self.password, self.slave_cores, self.redis_max_memory)
-        command = "{} start --block --redis-address {} --redis-password  {} --num-cpus {}".format(
+        command = "{} start --redis-address {} --redis-password  {} --num-cpus {}".format(
             self.ray_exec, redis_address, self.password, self.slave_cores)
         print("".format(command))
         modified_env = self.prepare_env(self.master_cores)
@@ -111,12 +112,12 @@ class RayContext(object):
 
         return _start_ray_services
 
+
 class RayRunner(object):
     # TODO: redis_port should be retrieved by random searched
     def __init__(self, sc, python_loc, redis_port="5346", password="123456"):
         self.sc = sc
-        self.executor_cores = self.sc._conf.get(
-            "spark.executor.cores")
+        self.executor_cores = self.get_executor_cores()
         self.num_executors = self.get_num_executors()
         self.redis_max_memory = self.sc._conf.get("spark.executor.pyspark.memory")
         # assert self.redis_max_memory, "you should set spark.executor.pyspark.memory"
@@ -128,8 +129,18 @@ class RayRunner(object):
                                       redis_max_memory=self.redis_max_memory,
                                       password=password)
 
+    def get_executor_cores(self):
+        if "local" in self.sc.master:
+            return int(re.match(r"local\[(.*)\]", self.sc.master).group(1))
+        else:
+            return self.sc._conf.get("spark.executor.cores")
+
+
     def get_num_executors(self):
-        return int(self.sc._conf.get("spark.executor.instances"))
+        if "local" in self.sc.master:
+            return 2
+        else:
+            return int(self.sc._conf.get("spark.executor.instances"))
 
     def run(self):
         # TODO: before involving thread, we need to figure out how to return the redis_address to user
