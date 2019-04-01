@@ -10,21 +10,21 @@ import ray
 from ray.experimental.sgd.sgd import DistributedSGD
 from ray.experimental.sgd.tfbench.test_model import TFBenchModel
 
-from ray_poc.util.process import simple_execute
+from ray_poc.util.process import session_execute
 
 
 # <class 'list'>: ['172.168.2.161:5346']
 # need to reduce the plasma memory consumption as well
 def start_dummy_ray_worker(redis_address, redis_password):
-    num_cores = 4
+    num_cores = 0
     command = "nohup {} start --redis-address {} --redis-password  {} --num-cpus {} --object-store-memory {}".format(
         "ray", redis_address, redis_password, num_cores, "1000000000")
     print("".format(command))
-    simple_execute(command)
+    session_execute(command)
 
 # devices_per_worker: cpu_nums
 # all_reduce_alg: strategy for gradient sync within the same worker
-def test_sgd(batch_size=2, num_workers=4, devices_per_worker=4, strategy="ps", warmup=True, num_iters=10, stats_interval=2):
+def test_sgd(batch_size=2, num_workers=4, devices_per_worker=2, strategy="ps", warmup=True, num_iters=10, stats_interval=2):
     model_creator = (
         lambda worker_idx, device_idx: TFBenchModel(
             batch=batch_size, use_cpus=True))
@@ -36,7 +36,7 @@ def test_sgd(batch_size=2, num_workers=4, devices_per_worker=4, strategy="ps", w
         gpu=False,
         strategy=strategy,
         # grad_shard_bytes=0,
-        grad_shard_bytes=10000000,
+        grad_shard_bytes=64000000,
         all_reduce_alg='simple')
 
     if warmup:
