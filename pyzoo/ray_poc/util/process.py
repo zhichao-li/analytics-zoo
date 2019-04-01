@@ -5,7 +5,7 @@ import atexit
 
 class ProcessResource(object):
     pgids=[]
-
+    exception=[]
 
 def session_execute(command, env=None):
     pro = subprocess.Popen(

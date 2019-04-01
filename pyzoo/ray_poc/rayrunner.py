@@ -17,7 +17,11 @@ def _gen_shutdown_per_node(pgids):
         print("shutting down pgid: {}".format(pgids))
         for pgid in pgids:
             print("killing {}".format(pgid))
-            os.killpg(pgid, signal.SIGTERM)
+            try:
+                os.killpg(pgid, signal.SIGTERM)
+            except ProcessLookupError:
+                print("WARNING: cannot find pgid: {}".format(pgid))
+
     return _shutdown_per_node
 
 class RayContext(object):
@@ -31,7 +35,8 @@ class RayContext(object):
        "OMP_NUM_THREADS":cores,
        "KMP_BLOCKTIME":0,
        "KMP_AFFINITY":"granularity = fine, verbose, compact, 1, 0",
-       "KMP_SETTINGS":0}
+       "KMP_SETTINGS":0
+               }  # MALLOC_ARENA_MAX
 
     def prepare_env(self, cores):
         modified_env = os.environ.copy()
@@ -67,7 +72,11 @@ class RayContext(object):
             self.master_cores)
 
         print("Starting ray master by running {}".format(command))
-        session_execute(command, env=modified_env)
+        try:
+            session_execute(command, env=modified_env)
+        except Exception as e:
+            ProcessResource.exception.append(e)
+
         time.sleep(self.WAITING_TIME_SEC)
 
     def start_raylet(self, redis_address):
@@ -77,12 +86,16 @@ class RayContext(object):
         """
         # command = "{} start --block --redis-address {} --redis-password  {} --num-cpus {} --redis-max-memory {}".format(
         #     self.ray_exec, redis_address, self.password, self.slave_cores, self.redis_max_memory)
-        command = "{} start --redis-address {} --redis-password  {} --num-cpus {}".format(
+        command = "{} start aa --redis-address {} --redis-password  {} --num-cpus {}".format(
             self.ray_exec, redis_address, self.password, self.slave_cores)
         print("".format(command))
 
         modified_env = self.prepare_env(self.master_cores)
-        session_execute(command, env=modified_env)
+        try:
+            session_execute(command, env=modified_env)
+        except Exception as e:
+            ProcessResource.exception.append(e)
+
         time.sleep(self.WAITING_TIME_SEC)
 
     def stop_ray(self):
@@ -118,11 +131,11 @@ class RayContext(object):
             if tc.partitionId() == 0:
                 print("partition id is : {}".format(tc.partitionId()))
                 self.start_master()
-                yield redis_address, ProcessResource.pgids
+                yield redis_address, ProcessResource.pgids, ProcessResource.exception
             else:
                 print("partition id is : {}".format(tc.partitionId()))
                 self.start_raylet(redis_address=redis_address)
-                yield None, ProcessResource.pgids
+                yield None, ProcessResource.pgids, ProcessResource.exception
             tc.barrier()
 
         return _start_ray_services
@@ -169,13 +182,16 @@ class RayRunner(object):
     def _parse_running_meta(self, running_meta):
         addrs = []
         pgids = []
+        exceptions = []
         for pmeta in running_meta:
             addrs.append(pmeta[0])
             pgids.append(pmeta[1])
+            exceptions.append(pmeta[2])
         addrs = [addr for addr in addrs if addr]
         pgids=list(itertools.chain.from_iterable(pgids))
+        exceptions=list(itertools.chain.from_iterable(exceptions))
         assert len(addrs) == 1, "we should only have one redis address"
-        return addrs[0], pgids
+        return addrs[0], pgids, exceptions
 
     def _run(self):
         # TODO: it should return [IP, gpid], then we can only kill the gpid if the ip address match.
@@ -183,11 +199,14 @@ class RayRunner(object):
                                       self.num_executors,
                                       numSlices=self.num_executors).barrier().mapPartitions(
             self.ray_context.gen_ray_booter()).collect()
-        redis_address, pgids = self._parse_running_meta(running_meta)
+        redis_address, pgids, exceptions = self._parse_running_meta(running_meta)
+
         self.redis_address = redis_address
         ProcessResource.pgids = pgids
         # what if half of the services is started and then exception happen?
         self.register_shutdown_hook()
+        if len(exceptions) > 0:
+            raise Exception(exceptions)
         return redis_address
 
 
@@ -221,3 +240,11 @@ class RayRunner(object):
         import ray
         ray.init(redis_address=self.redis_address,
                  redis_password=self.password)
+
+        # catch all signal.
+        # for i in [x for x in dir(signal) if x.startswith("SIG")]:
+        #     try:
+        #         signum = getattr(signal, i)
+        #         signal.signal(signum, sighandler)
+        #     except (OSError, RuntimeError) as m:  # OSError for Python3, RuntimeError for 2
+        #         print ("Skipping {}".format(i))
