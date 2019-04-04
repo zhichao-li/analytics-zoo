@@ -24,7 +24,7 @@ def start_dummy_ray_worker(redis_address, redis_password):
 
 # devices_per_worker: cpu_nums
 # all_reduce_alg: strategy for gradient sync within the same worker
-def test_sgd(batch_size=2, num_workers=4, devices_per_worker=2, strategy="ps", warmup=True, num_iters=10, stats_interval=2):
+def test_sgd(batch_size, num_workers, grad_shard_bytes, devices_per_worker=2, strategy="ps", warmup=True, num_iters=50, stats_interval=2, ):
     model_creator = (
         lambda worker_idx, device_idx: TFBenchModel(
             batch=batch_size, use_cpus=True))
@@ -36,7 +36,7 @@ def test_sgd(batch_size=2, num_workers=4, devices_per_worker=2, strategy="ps", w
         gpu=False,
         strategy=strategy,
         # grad_shard_bytes=0,
-        grad_shard_bytes=64000000,
+        grad_shard_bytes=grad_shard_bytes,
         all_reduce_alg='simple')
 
     if warmup:
@@ -59,18 +59,18 @@ def test_sgd(batch_size=2, num_workers=4, devices_per_worker=2, strategy="ps", w
 
     print("Peak throughput", max(sum(t[i:i + 5]) / 5 for i in range(len(t))))
 
-def start_ray_driver(redis_address='172.168.2.159:5346',
+def start_ray_driver(redis_address,
     redis_password='123456', object_store_memory="2g"):
 
-    # start_dummy_ray_worker(redis_address, redis_password)
+    start_dummy_ray_worker(redis_address, redis_password)
     # TODO: we need to wait for worker ready here....
     ray.shutdown()
     ray.init(redis_address=redis_address,
              redis_password=redis_password)
 
-# start_ray_driver(redis_address="172.168.2.156:5346")
-start_ray_driver(redis_address="172.168.2.118:8234")
-
-test_sgd()
-
-ray.shutdown()
+# # start_ray_driver(redis_address="172.168.2.156:5346")
+# start_ray_driver(redis_address="172.168.2.152:5346")
+#
+# test_sgd()
+#
+# ray.shutdown()

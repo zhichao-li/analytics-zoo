@@ -28,16 +28,19 @@ def init_spark(spark_home,
         return '--master {} --driver-memory {} '.format(master, driver_memory)
 
     def _yarn_opt():
-        return "--archives {}#python_env --num-executors {} --executor-cores {} --executor-memory {} ".format(
-            python_env_archive, num_executor, executor_cores, executor_memory)
+        return "--archives {}#python_env --num-executors {} --executor-cores {} --executor-memory {} --py-files {}  ".format(
+            python_env_archive, num_executor, executor_cores, executor_memory, python_zip_file)
 
     def _submit_opt(master):
         if "local" in master:
             return _common_opt() + 'pyspark-shell', {"spark.driver.memory":driver_memory}
         elif "yarn" in master:
-            conf = {"spark.yarn.archive":spark_yarn_jars,
+            conf = {
                     "spark.scheduler.minRegisterreResourcesRatio":"1.0",
                     "spark.task.cpus":executor_cores}
+
+            if spark_yarn_jars:
+                conf.insert("spark.yarn.archive", spark_yarn_jars)
             return _common_opt() + _yarn_opt() + 'pyspark-shell', conf
         else:
             raise Exception("Not supported master: {}".format(master))
@@ -58,7 +61,7 @@ def init_spark(spark_home,
         spark_conf.config(key=key, value=value)
     spark = spark_conf.getOrCreate()
     sc = spark.sparkContext
-    # sc.setLogLevel("DEBUG")
+    sc.setLogLevel("INFO")
     return sc, os.environ['PYSPARK_PYTHON']
 
 
@@ -86,7 +89,7 @@ def init_spark_on_yarn(spark_home,
                        spark_yarn_jars,
                        python_env_archive,
                        python_zip_file,
-                       num_executor=3,
+                       num_executor,
                        executor_cores=28,
                        executor_memory="100g",
                        driver_memory="10g",
