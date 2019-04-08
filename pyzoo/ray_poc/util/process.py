@@ -4,6 +4,9 @@ import signal
 import atexit
 import sys
 
+from ray_poc.util import _gen_shutdown_per_node, is_local
+
+
 class ProcessInfo(object):
     def __init__(self, out, err, errorcode, pgid, pid=None, node_ip=None):
         self.out=out
@@ -39,24 +42,14 @@ def session_execute(command, env=None, tag=None):
     return ProcessInfo(out, err, pro.returncode, pgid, tag)
 
 
-def _gen_shutdown_per_node(pgids):
-    def _shutdown_per_node(iter):
-        print("shutting down pgid: {}".format(pgids))
-        for pgid in pgids:
-            print("killing {}".format(pgid))
-            try:
-                os.killpg(pgid, signal.SIGTERM)
-            except ProcessLookupError:
-                print("WARNING: cannot find pgid: {}".format(pgid))
-
-    return _shutdown_per_node
-
 class ProcessMonitor:
     # what if half of the services is started and then exception happen?
-    def __init__(self, process_infos, sc):
+    def __init__(self, process_infos, sc, ray_rdd):
+        self.sc = sc
+        self.ray_rdd = ray_rdd
         self.master = []
         self.slaves = []
-        self.pgdis=[] # TODO: change me to dict
+        self.pgids=[] # TODO: change me to dict
         for process_info in process_infos:
             self.pgids.append(process_info.pgid)
             if process_info.master_addr:
@@ -66,7 +59,13 @@ class ProcessMonitor:
         self.register_shutdown_hook()
         # throw exception if any
         assert len(self.master) == 1, "We should got 1 master only, but we got {}".format(len(self.master))
+        self.master = self.master[0]
+        if not is_local(self.sc):
+            self.print_ray_remote_err_out()
 
+
+
+    def print_ray_remote_err_out(self):
         if self.master.errorcode != 0:
             raise Exception(self.master.err)
         for slave in self.slaves:
@@ -77,13 +76,10 @@ class ProcessMonitor:
         for slave in self.slaves:
             # TODO: implement __str__ for class ProcessInfo
             print(slave.out)
-        return self.master.master_addr
 
     def register_shutdown_hook(self):
         def _shutdown():
-            self.sc.range(0,
-                          self.num_executors,
-                          numSlices=self.num_executors).map(_gen_shutdown_per_node(self.pgdis)).collect()
+            self.ray_rdd.map(_gen_shutdown_per_node(self.pgids)).collect()
 
         def _signal_shutdown(_signo, _stack_frame):
             _shutdown()

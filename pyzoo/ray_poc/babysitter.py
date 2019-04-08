@@ -39,7 +39,7 @@ sc, python_loc = init_spark_on_local(spark_home=spark_home,
                      python_loc=python_loc,
                      python_zip_file=python_zip_file,
                      driver_memory="10g",
-                     driver_cores=4)
+                     driver_cores=num_workers + 1) # plus 1 for master
 
 
 # sc, python_loc = init_spark_on_yarn(spark_home=spark_home,

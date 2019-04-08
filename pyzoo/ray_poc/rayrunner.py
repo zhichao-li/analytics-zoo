@@ -8,7 +8,7 @@ import signal
 import sys
 import itertools
 
-
+from ray_poc.util import is_local
 from ray_poc.util.process import session_execute, ProcessMonitor
 
 
@@ -39,25 +39,30 @@ class RayContext(object):
         return modified_env
 
 
-    def __init__(self, python_loc, redis_port, slave_cores, master_cores, redis_max_memory, password):
+    def __init__(self, python_loc, redis_port, mkl_cores, redis_max_memory, password):
         self.python_loc = python_loc
         self.redis_port = redis_port
         self.password = password
-        self.slave_cores = slave_cores
-        self.master_cores = master_cores
+        self.mkl_cores=mkl_cores
         self.redis_max_memory=redis_max_memory
         self.ray_exec = self.get_ray_exec()
         self.WAITING_TIME_SEC = 10
+
+    def _get_ray_cores(self):
+        # 2 for worker 1 for parameterserver.
+       return 3
+
+
 
     def start_master(self):
         """
         Start the Master for Ray
         :return:
         """
-        modified_env = self.prepare_env(self.master_cores)
+        modified_env = self.prepare_env(self.mkl_cores)
         command = "{} start --head --include-webui --redis-port {} --redis-password {} --num-cpus {} ".format(
             self.ray_exec, self.redis_port, self.password,
-            self.master_cores)
+            self._get_ray_cores())
         print("Starting ray master by running: {}".format(command))
         process_info = session_execute(command, env=modified_env, tag="ray_master")
         # TODO: we need to think serious about the time setting otherwise client would not be able to connect to the master
@@ -70,10 +75,10 @@ class RayContext(object):
         :return:
         """
         command = "{} start --redis-address {} --redis-password  {} --num-cpus {} ".format(
-            self.ray_exec, redis_address, self.password, self.slave_cores)
+            self.ray_exec, redis_address, self.password, self._get_ray_cores())
         print("Starting raylet by running: {}".format(command))
 
-        modified_env = self.prepare_env(self.master_cores)
+        modified_env = self.prepare_env(self.mkl_cores)
         time.sleep(self.WAITING_TIME_SEC)
         return session_execute(command, env=modified_env, tag="raylet")
 
@@ -132,18 +137,22 @@ class RayRunner(object):
         self.ray_context = RayContext(
                                       python_loc=python_loc,
                                       redis_port=redis_port,
-                                      slave_cores=self.executor_cores,
-                                      master_cores=self.executor_cores,
+                                      mkl_cores=self._get_mkl_cores(),
                                       redis_max_memory=self.redis_max_memory,
                                       password=password)
 
+    def _get_mkl_cores(self):
+        if is_local(self.sc):
+            return 1  # TODO: make this configurable
+        else:
+            return self.spark_executor_cores
+
     def get_executor_cores(self):
-        return 3
         # TODO: if cores > 1, then there would be possible that 2 sgd_worker run on the same node
-        # if "local" in self.sc.master:
-        #     return int(re.match(r"local\[(.*)\]", self.sc.master).group(1))
-        # else:
-        #     return self.sc._conf.get("spark.executor.cores")
+        if "local" in self.sc.master:
+            return int(re.match(r"local\[(.*)\]", self.sc.master).group(1))
+        else:
+            return self.sc._conf.get("spark.executor.cores")
 
 
     def get_num_executors(self):
@@ -164,12 +173,14 @@ class RayRunner(object):
 
     def _run(self):
         # TODO: it should return [IP, gpid], then we can only kill the gpid if the ip address match.
-        process_infos = self.sc.range(0,
+        ray_rdd = self.sc.range(0,
                                       self.num_executors,
-                                      numSlices=self.num_executors).barrier().mapPartitions(
+                                      numSlices=self.num_executors)
+        process_infos = ray_rdd.barrier().mapPartitions(
             self.ray_context.gen_ray_booter()).collect()
 
-        self.redis_address = ProcessMonitor(process_infos, self.sc)
+        processMonitor = ProcessMonitor(process_infos, self.sc, ray_rdd)
+        self.redis_address = processMonitor.master.master_addr
         return self.redis_address
 
 
@@ -196,10 +207,4 @@ class RayRunner(object):
         ray.init(redis_address=self.redis_address,
                  redis_password=self.password)
 
-        # catch all signal.
-        # for i in [x for x in dir(signal) if x.startswith("SIG")]:
-        #     try:
-        #         signum = getattr(signal, i)
-        #         signal.signal(signum, sighandler)
-        #     except (OSError, RuntimeError) as m:  # OSError for Python3, RuntimeError for 2
-        #         print ("Skipping {}".format(i))
+

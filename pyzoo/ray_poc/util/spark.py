@@ -72,8 +72,8 @@ def init_spark_on_local(spark_home,
                      java_home,
                      python_loc,
                      python_zip_file,
-                     driver_memory="10g",
-                     driver_cores=10):
+                     driver_memory,
+                     driver_cores):
     os.environ['PYSPARK_PYTHON'] = python_loc
     return init_spark(spark_home=spark_home,
                        java_home=java_home,
