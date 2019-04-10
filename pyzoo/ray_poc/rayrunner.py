@@ -22,7 +22,7 @@ class RayContext(object):
        "inter_op_parallelism_threads":str(cores),
        "OMP_NUM_THREADS":str(cores),
        "KMP_BLOCKTIME":"0",
-       "KMP_AFFINITY":"granularity = fine, verbose, compact, 1, 0",
+       "KMP_AFFINITY":"granularity = fine, compact, 1, 0",
        "KMP_SETTINGS":"0"
                }
 
@@ -33,6 +33,7 @@ class RayContext(object):
         modified_env.pop("MALLOC_ARENA_MAX", None)
         modified_env.pop("RAY_BACKEND_LOG_LEVEL", None)
         if cores:
+            print("MKL cores is {}".format(cores))
             modified_env.update(self.get_MKL_config(cores))
             print(modified_env)
         print("The command searching path is: {}".format(modified_env["PATH"]))

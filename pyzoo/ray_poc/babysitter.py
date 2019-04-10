@@ -1,6 +1,5 @@
 import sys
 import os
-
 from ray_poc.mock_user import start_ray_driver, test_sgd
 
 # for yarn
@@ -14,11 +13,16 @@ from ray_poc.mock_user import start_ray_driver, test_sgd
 
 
 # for local mode
-spark_home = "/home/lizhichao/bin/spark-2.4.0-bin-hadoop2.7/"
-java_home = "/home/lizhichao/bin/jdk1.8.0_101/"
-python_loc = "/home/lizhichao/anaconda3/envs/py36/bin/python"
-python_zip_file = "/home/lizhichao/bin/god/analytics-zoo/pyzoo/ray_poc.zip"
+# spark_home = "/home/lizhichao/bin/spark-2.4.0-bin-hadoop2.7/"
+# java_home = "/home/lizhichao/bin/jdk1.8.0_101/"
+# python_loc = "/home/lizhichao/anaconda3/envs/py36/bin/python"
+# python_zip_file = "/home/lizhichao/bin/god/analytics-zoo/pyzoo/ray_poc.zip"
 
+# local node-018
+spark_home = "/home/zhichao/god/spark-2.4.0-bin-hadoop2.7/"
+java_home = "/home/zhichao/god/jdk1.8.0_101/"
+python_loc = "/home/zhichao/anaconda2/envs/ray36/bin/python"
+python_zip_file = "/home/zhichao/god/analytics-zoo/pyzoo/ray_poc.zip"
 
 def init_spark_env(spark_home):
     # this is a must otherwise javagateway would throw cannot connet error
@@ -58,12 +62,12 @@ sc, python_loc = init_spark_on_local(spark_home=spark_home,
 rayRunner = RayRunner(sc, python_loc)
 rayRunner.purge_ray_processes()
 redis_address = rayRunner.run()
-# redis_address is 56 but it returnning 59
 
 start_ray_driver(redis_address=redis_address)
+
+
 
 test_sgd(batch_size=128, num_workers=num_workers, grad_shard_bytes=85000000)
 
 print(redis_address)
 
-# TODO: setting the python log? or just print or redirect to elsewhere?
