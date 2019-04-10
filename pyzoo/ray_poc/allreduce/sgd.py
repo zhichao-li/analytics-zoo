@@ -10,51 +10,103 @@ import time
 import numpy as np
 
 import ray
-from ray.experimental.sgd.sgd_worker import SGDWorker
-from ray.experimental.sgd.param_server import ParameterServer
+
+from ray_poc.allreduce.ps import ShardedParameterServer
 
 logger = logging.getLogger(__name__)
 
+class RayDataSet(object):
+    pass
 
-class DistributedSGD(object):
+class DummyRayDataSet(RayDataSet):
+    def __init__(self, shape):
+        self.shape = shape
+
+    def next_batch(self):
+        return np.random.rand(self.shape)
+
+class ModelWorker(object):
+
+    def __init__(self, model, ray_data_set, num_workers):
+        self.model = model
+        self.num_workers = num_workers
+
+    def compute_next(self, *parameters):
+        """
+        It would return a sharded grads here.
+        Each parameter should be a 1-D vector
+        """
+        # concate grads
+        # TODO:
+        parameters = np.concatenate(parameters)
+        # TODO: model should have api: set_flat_paramters
+        self.model.set_flat_parameters(parameters)
+        # TODO: model should have api for getting next batch
+        input = self.ray_data_set()
+        grads = self.model.compute(input)
+        # split grads here
+        # TODO: enhance the split method here as it would raise exception if cannot be evently divided.
+        sharded_grads = np.split(grads, self.num_workers)
+        return sharded_grads
+
+
+
+class DistributedOptimizer(object):
 
     def __init__(self,
                  model,
                  num_workers):
-
+        self.num_workers = num_workers
         requests = {"num_cpus": 1}
 
-        RemoteSGDWorker = ray.remote(**requests)(SGDWorker)
+        ModelWorkerWithResource = ray.remote(**requests)(ModelWorker)
+
+        # TODO: remove this fake weights
+        weights = np.ones(64000000)
+        sharded_weights = np.split(weights, self.num_workers)
+        # TODO: implement get_grads
+        #grads = model.get_flat_grads()
+        grads = np.ones(64000000) # 64M
+        sharded_grads = np.split(grads, self.num_workers)
+
+        sharded_weight_ids = [ray.put(w) for w in sharded_weights]
+
         self.workers = []
+        self.pss = []
         logger.info(
-            "Creating SGD workers ({} total)".format(
+            "Creating parameter server ({} total)".format(
+                num_workers))
+        for ps_index in range(num_workers):
+            self.pss.append(
+                ShardedParameterServer.remote(sharded_weight_ids[ps_index]))
+
+        logger.info(
+            "Creating model workers ({} total)".format(
                 num_workers))
         for worker_index in range(num_workers):
             self.workers.append(
-                RemoteSGDWorker.remote(
-                    worker_index,
-                    model_creator))
+                ModelWorkerWithResource.remote(model, num_workers))
 
-        logger.info("Waiting for gradient configuration")
-        shard_shapes = ray.get(self.workers[0].shard_shapes.remote())
+        steps = 10
+        for step in steps:
+            self.run_step()
 
-        logger.info("Waiting for actors to start")
-        ray.get([w.shard_shapes.remote() for w in self.workers])
+    def run_step(self):
+        # workers of sharded_grads
+        sharded_grad_ids = []
+        # pull weights from ps
+        for worker in self.workers:
+            # 1) pull the latest weights from ps
+            parameter_ids = [ps.get_parameters.remote() for ps in self.pss]
+            # 2) compute the grads
+            sharded_grad_ids.append(worker.compute_next(parameter_ids))
 
-        if strategy == "ps":
-            logger.info("Starting parameter servers ({} shards)".format(
-                len(shard_shapes)))
-            self.ps_list = [
-                ParameterServer.remote(len(self.workers), i)
-                for i, s in enumerate(shard_shapes)
-            ]
-            ray.get([
-                ps.initialize.remote(s)
-                for ps, s in zip(self.ps_list, shard_shapes)
-            ])
-            logger.info("Parameter servers started")
-        else:
-            self.ps_list = []
+        grads_per_ps = zip(*sharded_grad_ids)
+        assert len(grads_per_ps[0]) == self.num_workers, "we should get correct grads for each ps"
+        # 3) push and aggregate grads on ps
+        for index, grads in enumerate(grads_per_ps):
+            self.pss[index].aggregate_grads_update_weights(grads)
+
 
 def _distributed_sgd_step(actors, ps_list, fetch_stats, write_timeline):
     # Preallocate object ids that actors will write gradient shards to
