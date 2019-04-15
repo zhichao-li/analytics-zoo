@@ -6,14 +6,16 @@ import logging
 import os
 import random
 import time
+import tensorflow as tf
 
 import numpy as np
 
 import ray
 
+from ray_poc import split
 from ray_poc.allreduce.ps import ShardedParameterServer
 
-from ray_poc.allreduce.RayModel import ClassicTFRayModel
+from ray_poc.allreduce.RayModel import ClassicTFRayModel, RayModel
 
 logger = logging.getLogger(__name__)
 
@@ -21,97 +23,96 @@ class RayDataSet(object):
     pass
 
 class DummyRayDataSet(RayDataSet):
-    def __init__(self, shape):
-        self.shape = shape
+    def __init__(self, feature_shape, label_shape):
+        self.feature_shape=feature_shape
+        self.label_shape=label_shape
 
+    # it should return list of inputs and list of labels
     def next_batch(self):
-        return np.random.rand(self.shape)
+        return [np.random.uniform(0, 1, size=self.feature_shape)], [np.random.uniform(0, 1, size=self.label_shape)],
 
+@ray.remote(num_cpus=1)
 class ModelWorker(object):
 
-    def __init__(self, ray_model, ray_data_set, num_workers):
+    def __init__(self, gen_ray_model, gen_ray_data_set, num_workers):
         # TODO: add a factory method for ModelWorker
 
-        # self.shape_of_grads = self.shape_of_grads
         self.num_workers = num_workers
-        self.ray_model = ray_model
+        self.ray_model = gen_ray_model()
+        self.ray_data_set = gen_ray_data_set()
 
-    def compute_gradients(self, *parameters):
+    def compute_gradients(self, parameters):
         """
         It would return a sharded grads here.
         Each parameter should be a 1-D vector
         """
         # concate grads
-        parameters = np.concatenate(parameters)
-        self.ray_model.set_flat_parameters(parameters)
+        flat_parameters = np.concatenate(parameters)
+        self.ray_model.set_flat_parameters(flat_parameters)
 
-        input = self.ray_data_set.next_batch()
-        grads = self.ray_model.compute_gradients(input)
-        flat_grads = np.concatenate(grads)
-        sharded_grads = ModelWorker.split(flat_grads, self.num_workers)
+        input, label = self.ray_data_set.next_batch()
+        grads = self.ray_model.compute_gradients(input, label)
+        flat_grads = np.concatenate([g.flatten() for g in grads])
+        sharded_grads = split(flat_grads, self.num_workers)
         return sharded_grads
 
-    @staticmethod
-    def split(v, num_slices):
-        """
-        Split v as evently as possible
-        :param v: An 1-D vector
-        :return: list of vectors
-        """
-        # TODO: enhance the split method here as it would raise exception if cannot be evently divided.
-        # np.split(grads, self.num_workers)
-        raise Exception("not yet")
 
-    @staticmethod
-    def split_by_shapes(v, shapes):
-        i = 0
-        arrays = []
-        for shape in shapes:
-            size = np.prod(shape, dtype=np.int)
-            array = v[i:(i + size)].reshape(shape)
-            arrays.append(array)
-            i += size
-        assert len(v) == i, "Passed vector does not have the correct shape."
-        return arrays
 
 
 
 class DistributedOptimizer(object):
 
     def __init__(self,
-                 model,
-                 num_workers):
-        self.num_workers = num_workers
-        requests = {"num_cpus": 1}
+                 gen_ray_model,
+                 gen_ray_data_set,
+                 num_worker):
+        self.num_worker = num_worker
+        # requests = {"num_cpus": 1}
 
-        # TODO: add a factory method here for Keras model
-        self.ray_model = ClassicTFRayModel(model)
-        ModelWorkerWithResource = ray.remote(**requests)(ModelWorker)
+        self.ray_model = gen_ray_model()
+        # ModelWorkerWithResource = ray.remote(**requests)(ModelWorker)
 
-        grads = self.ray_model.get_flat_parameters()
-        sharded_grads = np.split(grads, self.num_workers)
-
+        weights = self.ray_model.get_flat_parameters()
+        sharded_weights = np.split(weights, self.num_worker)
+        # sync the parameters in PS
         sharded_weight_ids = [ray.put(w) for w in sharded_weights]
 
         self.workers = []
         self.pss = []
         logger.info(
             "Creating parameter server ({} total)".format(
-                num_workers))
-        for ps_index in range(num_workers):
+                num_worker))
+        def gen_opt():
+            return tf.train.AdamOptimizer(0.1)
+        for ps_index in range(num_worker):
             self.pss.append(
-                ShardedParameterServer.remote(sharded_weight_ids[ps_index]))
+                ShardedParameterServer.remote(sharded_weight_ids[ps_index], gen_ray_model=gen_ray_model))
 
         logger.info(
             "Creating model workers ({} total)".format(
-                num_workers))
-        for worker_index in range(num_workers):
+                num_worker))
+        for worker_index in range(num_worker):
             self.workers.append(
-                ModelWorkerWithResource.remote(model, num_workers))
+                ModelWorker.remote(gen_ray_model, gen_ray_data_set, num_worker))
 
         steps = 10
-        for step in steps:
+        for step in range(0, steps):
             self.run_step()
+
+    @classmethod
+    def from_classic_tf(cls, model_fn, dataset_fn, num_worker):
+
+        def ray_model_fn():
+            loss, optimizer, input, label = model_fn()
+            ray_model = ClassicTFRayModel(loss_op=loss,
+                                          optimizer=optimizer,
+                                          input_ops=input,
+                                          label_ops=label,
+                                          num_worker=num_worker)
+            return ray_model
+        return cls(gen_ray_model=ray_model_fn,
+                 gen_ray_data_set=dataset_fn,
+                    num_worker=num_worker)
 
     def run_step(self):
         # workers of sharded_grads
@@ -119,68 +120,15 @@ class DistributedOptimizer(object):
         # pull weights from ps
         for worker in self.workers:
             # 1) pull the latest weights from ps
-            grads = [ps.get_value.remote() for ps in self.pss]
+            parameters = [ps.get_parameters.remote() for ps in self.pss]
             # 2) compute the grads
-            sharded_grad_ids.append(worker.apply_and_compute_gradients(grads))
+            sharded_grad_ids.append(worker.compute_gradients.remote(parameters))
 
-        grads_per_ps = zip(*sharded_grad_ids)
-        assert len(grads_per_ps[0]) == self.num_workers, "we should get correct grads for each ps"
+        # TODO: performance?
+        grads_per_ps = list(zip(*sharded_grad_ids))
+        assert len(grads_per_ps[0]) == self.num_worker, "we should get correct grads for each ps"
         # 3) push and aggregate grads on ps
         for index, grads in enumerate(grads_per_ps):
-            self.pss[index].aggregate_grads(grads)
+            self.pss[index].apply_gradients.remote(grads)
 
-#
-# def _distributed_sgd_step(actors, ps_list, fetch_stats, write_timeline):
-#     # Preallocate object ids that actors will write gradient shards to
-#     grad_shard_oids_list = [[np.random.bytes(20) for _ in ps_list]
-#                             for _ in actors]
-#     logger.debug("Generated grad oids")
-#
-#     # Preallocate object ids that param servers will write new weights to
-#     accum_shard_ids = [np.random.bytes(20) for _ in ps_list]
-#     logger.debug("Generated accum oids")
-#
-#     # Kick off the fused compute grad / update weights tf run for each actor
-#     losses = []
-#     for actor, grad_shard_oids in zip(actors, grad_shard_oids_list):
-#         losses.append(
-#             actor.ps_compute_apply.remote(
-#                 grad_shard_oids,
-#                 accum_shard_ids,
-#                 write_timeline=write_timeline))
-#     logger.debug("Launched all ps_compute_applys on all actors")
-#
-#     # Issue prefetch ops
-#     for j, (ps, weight_shard_oid) in list(
-#             enumerate(zip(ps_list, accum_shard_ids)))[::-1]:
-#         to_fetch = []
-#         for grad_shard_oids in grad_shard_oids_list:
-#             to_fetch.append(grad_shard_oids[j])
-#         random.shuffle(to_fetch)
-#         ps.prefetch.remote(to_fetch)
-#     logger.debug("Launched all prefetch ops")
-#
-#     # Aggregate the gradients produced by the actors. These operations
-#     # run concurrently with the actor methods above.
-#     ps_gets = []
-#     for j, (ps, weight_shard_oid) in list(
-#             enumerate(zip(ps_list, accum_shard_ids)))[::-1]:
-#         ps.add_spinwait.remote([gs[j] for gs in grad_shard_oids_list])
-#         ps_gets.append(ps.get.remote(weight_shard_oid))
-#     logger.debug("Launched all aggregate ops")
-#
-#     if write_timeline:
-#         timelines = [ps.get_timeline.remote() for ps in ps_list]
-#         logger.debug("Launched timeline gets")
-#         timelines = ray.get(timelines)
-#         t0 = timelines[0]
-#         for t in timelines[1:]:
-#             t0.merge(t)
-#         t0.chrome_trace_format("ps_timeline.json")
-#     else:
-#         # Wait for at least the ps gets to finish
-#         ray.get(ps_gets)
-#     if fetch_stats:
-#         return {"loss": np.mean(ray.get(losses))}
-#     else:
-#         return None
+

@@ -13,7 +13,6 @@ def unflatten(vector, shapes):
         array = vector[i:(i + size)].reshape(shape)
         arrays.append(array)
         i += size
-    assert len(vector) == i, "Passed weight does not have the correct shape."
     return arrays
 
 

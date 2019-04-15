@@ -1,13 +1,20 @@
 import tensorflow as tf
 import numpy as np
+import ray
 
+@ray.remote(num_cpus=1)
 class ShardedParameterServer(object):
     # ray_model would automatically serde here?
-    def __init__(self, parameters, optimizer):
+    def __init__(self, parameters, gen_ray_model):
         """
         :param parameters: 1D ndarray
         :param optimizer:
         """
+        # TODO: we only need to pass a gen_optimizer here.
+        ray_model = gen_ray_model()
+        self.optimizer=ray_model.optimizer
+
+        self.parameters=parameters
         self.grad_holder = tf.placeholder(
             tf.float32,
             self.parameters.shape,
@@ -18,20 +25,21 @@ class ShardedParameterServer(object):
             dtype=tf.float32,
             name="variable_weights")
 
-        self.apply_op = optimizer.apply_gradients([(self.grad_holder, self.weight_var)])
+        self.apply_op = self.optimizer.apply_gradients([(self.grad_holder, self.weight_var)])
         # TODO: turn the parameter here?
-        sess = tf.Session(
-            config=tf.ConfigProto(
-                intra_op_parallelism_threads=1,
-                inter_op_parallelism_threads=1))
-        sess.run(tf.global_variables_initializer())
+        # sess = tf.Session(
+        #     config=tf.ConfigProto(
+        #         intra_op_parallelism_threads=1,
+        #         inter_op_parallelism_threads=1))
+        self.sess = tf.Session()
+        self.sess.run(tf.global_variables_initializer())
         self.parameters = parameters
 
     def get_parameters(self):
         return self.parameters
 
 
-    def apply_gradients(self, *gradients):
+    def apply_gradients(self, gradients):
         """
         :param gradients:
         :return: updated weights
