@@ -68,7 +68,7 @@ import tensorflow as tf
 def dataset_fn():
     return ResNetDummyDataSet()
 
-ray.init(local_mode=False, log_to_driver=True)
-
-
-dopt = DistributedOptimizer.from_classic_tf(model_fn=classic_tf_fn, dataset_fn=dataset_fn, batch_size=batch_size, num_worker=2)
+# ray.init(local_mode=False, log_to_driver=True)
+#
+#
+# dopt = DistributedOptimizer.from_classic_tf(model_fn=classic_tf_fn, dataset_fn=dataset_fn, batch_size=batch_size, num_worker=2)

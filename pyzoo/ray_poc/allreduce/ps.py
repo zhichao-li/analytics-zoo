@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import ray
 
-@ray.remote(num_cpus=1)
+@ray.remote(resources={"ps":1})
 class ShardedParameterServer(object):
     # ray_model would automatically serde here?
     def __init__(self, parameters, gen_ray_model):

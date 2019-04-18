@@ -31,7 +31,8 @@ class DummyRayDataSet(RayDataSet):
     def next_batch(self):
         return [np.random.uniform(0, 1, size=self.feature_shape)], [np.random.uniform(0, 1, size=self.label_shape)],
 
-@ray.remote(num_cpus=1)
+
+@ray.remote(resources={"trainer":1})
 class ModelWorker(object):
 
     def __init__(self, gen_ray_model, gen_ray_data_set, num_workers):
@@ -49,11 +50,11 @@ class ModelWorker(object):
         Each parameter should be a 1-D vector
         """
         # concate grads
-        print("######################33")
-        print(type(parameters))
-        print(type(parameters[0]))
-        print(type(parameters[0][0]))
-        print(parameters[0].shape)
+        # print("######################33")
+        # print(type(parameters))
+        # print(type(parameters[0]))
+        # print(type(parameters[0][0]))
+        # print(parameters[0].shape)
         # [ray.get(p) for p in ]
 
         flat_parameters = np.concatenate(parameters)
@@ -68,8 +69,6 @@ class ModelWorker(object):
         sharded_grads = split(flat_grads, self.num_workers)
         # sharded_grads = [ray.put(s) for s in sharded_grads]
         return sharded_grads
-
-
 
 
 class DistributedOptimizer(object):
@@ -108,7 +107,7 @@ class DistributedOptimizer(object):
             self.workers.append(
                 ModelWorker.remote(gen_ray_model, gen_ray_data_set, num_worker))
 
-        steps = 10
+        steps = 1000
         for step in range(0, steps):
             start = time.time()
             self.run_step(step)
@@ -142,6 +141,9 @@ class DistributedOptimizer(object):
             # 1) pull the latest weights from ps
             parameters = [ps.get_parameters.remote() for ps in self.pss]
             # 2) compute the grads
+
+            # sharded_grad = ray.method(num_return_vals=self.num_worker)(worker.set_parameters_compute_gradients).remote(*parameters)
+
             sharded_grad = worker.set_parameters_compute_gradients.remote(*parameters)
             sharded_grad_ids.append(sharded_grad)
             # losses.append(loss)
@@ -153,11 +155,14 @@ class DistributedOptimizer(object):
         # print("Iteration: {}, acc is {}".format(step_id, np.mean([ray.get(acc) for acc in accs])))
 
         # TODO: performance?
-        grads_per_ps = list(zip(*sharded_grad_ids))
-        ray.get(grads_per_ps[0][0])
-        assert len(grads_per_ps[0]) == self.num_worker, "we should get correct grads for each ps"
-        # 3) push and aggregate grads on ps
-        for index, grads in enumerate(grads_per_ps):
-            self.pss[index].apply_gradients.remote(*grads)
+        if len(sharded_grad_ids) > 1:
+            grads_per_ps = list(zip(*sharded_grad_ids))
+            ray.get(grads_per_ps[0][0])
+            assert len(grads_per_ps[0]) == self.num_worker, "we should get correct grads for each ps"
+            # 3) push and aggregate grads on ps
+            for index, grads in enumerate(grads_per_ps):
+                self.pss[index].apply_gradients.remote(*grads)
+        else:
+            self.pss[0].apply_gradients.remote(sharded_grad_ids)
 
 

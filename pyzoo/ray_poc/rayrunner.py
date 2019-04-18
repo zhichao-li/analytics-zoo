@@ -35,7 +35,9 @@ class RayContext(object):
         if cores:
             print("MKL cores is {}".format(cores))
             modified_env.update(self.get_MKL_config(cores))
-            print(modified_env)
+        print("Executing with these environment setting:")
+        for pair in modified_env.items():
+            print(pair)
         print("The command searching path is: {}".format(modified_env["PATH"]))
         return modified_env
 
@@ -48,11 +50,12 @@ class RayContext(object):
         self.redis_max_memory=redis_max_memory
         self.ray_exec = self.get_ray_exec()
         self.WAITING_TIME_SEC = 10
+        self.labels = """--resources='{"trainer": %s, "ps": %s }' """ % (1, 1)
+        print(self.labels)
 
     def _get_ray_cores(self):
         # 2 for worker 1 for parameterserver.
        return 3
-
 
 
     def start_master(self):
@@ -61,9 +64,10 @@ class RayContext(object):
         :return:
         """
         modified_env = self.prepare_env(self.mkl_cores)
-        command = "{} start --head --include-webui --redis-port {} --redis-password {} --num-cpus {} ".format(
+
+        command = "{} start --head --include-webui --redis-port {} --redis-password {} --num-cpus {}  {}".format(
             self.ray_exec, self.redis_port, self.password,
-            self._get_ray_cores())
+            self._get_ray_cores(), self.labels)
         print("Starting ray master by running: {}".format(command))
         process_info = session_execute(command, env=modified_env, tag="ray_master")
         # TODO: we need to think serious about the time setting otherwise client would not be able to connect to the master
@@ -75,8 +79,8 @@ class RayContext(object):
         Start the Slave for Ray
         :return:
         """
-        command = "{} start --redis-address {} --redis-password  {} --num-cpus {} ".format(
-            self.ray_exec, redis_address, self.password, self._get_ray_cores())
+        command = "{} start --redis-address {} --redis-password  {} --num-cpus {} {}  ".format(
+            self.ray_exec, redis_address, self.password, self._get_ray_cores(), self.labels)
         print("Starting raylet by running: {}".format(command))
 
         modified_env = self.prepare_env(self.mkl_cores)
@@ -144,9 +148,9 @@ class RayRunner(object):
 
     def _get_mkl_cores(self):
         if is_local(self.sc):
-            return 1  # TODO: make this configurable
+            return 28  # TODO: make this configurable
         else:
-            return self.spark_executor_cores
+            return self.executor_cores
 
     def get_executor_cores(self):
         # TODO: if cores > 1, then there would be possible that 2 sgd_worker run on the same node
