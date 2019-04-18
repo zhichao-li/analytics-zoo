@@ -36,10 +36,11 @@ class ShardedParameterServer(object):
         self.parameters = parameters
 
     def get_parameters(self):
+        # raise Exception("bad bad")
         return self.parameters
 
 
-    def apply_gradients(self, gradients):
+    def apply_gradients(self, *gradients):
         """
         :param gradients:
         :return: updated weights

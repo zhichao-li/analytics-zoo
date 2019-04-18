@@ -19,7 +19,6 @@ def unflatten(vector, shapes):
 
 class GVHelper(object):
 
-
     def __init__(self, sess, grad_vars):
         self.grads = []
         self.vars = []
