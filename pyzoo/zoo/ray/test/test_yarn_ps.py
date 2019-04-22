@@ -13,7 +13,7 @@ extra_pmodule_zip = "/home/zhichao/god/analytics-zoo/pyzoo.zip"
 python_loc = "/home/zhichao/anaconda3/envs/ray36/bin/python"
 
 
-from zoo import RayRunner
+from zoo.ray.rayrunner import RayRunner
 spark_runner = SparkRunner(spark_home=spark_home, java_home=java_home)
 
 num_workers = 4

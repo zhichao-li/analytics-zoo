@@ -8,8 +8,8 @@ import time
 import numpy as np
 import ray
 
-from zoo.ray import ClassicTFRayModel
-from zoo.ray import ShardedParameterServer
+from zoo.ray.allreduce.RayModel import ClassicTFRayModel
+from zoo.ray.allreduce.ps import ShardedParameterServer
 from zoo.ray import split
 
 logger = logging.getLogger(__name__)

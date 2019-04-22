@@ -1,4 +1,4 @@
-from zoo.ray  import RayDataSet
+from zoo.ray.allreduce.sgd  import RayDataSet
 from ray.experimental.sgd.tfbench import model_config
 
 class MockDataset():

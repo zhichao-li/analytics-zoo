@@ -1,7 +1,5 @@
-from zoo.ray import DistributedOptimizer
-from zoo.ray import classic_tf_fn
-from zoo.ray import dataset_fn
-
+from zoo.ray.allreduce.sgd import DistributedOptimizer
+from zoo.ray.test.allreduce.test_resnet import dataset_fn, classic_tf_fn
 
 
 def test_resnet_ps(num_worker):
