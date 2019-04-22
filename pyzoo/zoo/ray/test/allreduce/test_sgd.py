@@ -1,7 +1,8 @@
-from ray_poc.allreduce.sgd import DistributedOptimizer, DummyRayDataSet
-from ray_poc.test.allreduce.model import create_classic_tf_model
 import ray
-import tensorflow as tf
+
+from zoo.ray import DistributedOptimizer, DummyRayDataSet
+from zoo.ray import create_classic_tf_model
+
 
 def dataset_fn():
     return DummyRayDataSet(feature_shape=[32, 784], label_shape=[32, 10])

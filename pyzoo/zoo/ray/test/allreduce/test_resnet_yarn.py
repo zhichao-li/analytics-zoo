@@ -1,6 +1,6 @@
-from ray_poc.allreduce.sgd import DistributedOptimizer
-from ray_poc.test.allreduce.test_resnet import classic_tf_fn
-from ray_poc.test.allreduce.test_resnet import dataset_fn
+from zoo.ray import DistributedOptimizer
+from zoo.ray import classic_tf_fn
+from zoo.ray import dataset_fn
 
 
 

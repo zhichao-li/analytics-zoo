@@ -57,8 +57,9 @@ class SparkRunner():
                     "spark.task.cpus": executor_cores}
                 if spark_yarn_jars:
                     conf.insert("spark.yarn.archive", spark_yarn_jars)
-                    return _common_opt() + _yarn_opt() + 'pyspark-shell', conf
-            raise Exception("Not supported master: {}".format(master))
+                return _common_opt() + _yarn_opt() + 'pyspark-shell', conf
+            else:
+                raise Exception("Not supported master: {}".format(master))
 
         submit_args, conf = _submit_opt(master)
         os.environ['PYSPARK_SUBMIT_ARGS'] = submit_args
@@ -88,7 +89,6 @@ class SparkRunner():
 
     def init_spark_on_yarn(self,
                            hadoop_conf,
-                           spark_yarn_jars,
                            penv_archive,
                            extra_pmodule_zip,
                            num_executor,
@@ -98,7 +98,8 @@ class SparkRunner():
                            driver_cores=10,
                            spark_executor_pyspark_memory="60g",
                            master="yarn",
-                           hadoop_user_name="root"):
+                           hadoop_user_name="root",
+        spark_yarn_jars=None):
         os.environ["HADOOP_CONF_DIR"] = hadoop_conf
         os.environ['HADOOP_USER_NAME'] = hadoop_user_name
         os.environ['PYSPARK_PYTHON'] = "python_env/bin/python"

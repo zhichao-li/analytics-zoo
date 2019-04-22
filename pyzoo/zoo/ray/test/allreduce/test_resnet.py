@@ -1,6 +1,4 @@
-import tensorflow as tf
-
-from ray_poc.allreduce.sgd import RayDataSet
+from zoo.ray  import RayDataSet
 from ray.experimental.sgd.tfbench import model_config
 
 class MockDataset():
@@ -59,9 +57,6 @@ class ResNetDummyDataSet(RayDataSet):
         return self.dummy
 
 
-
-from ray_poc.allreduce.sgd import DistributedOptimizer, DummyRayDataSet
-from ray_poc.test.allreduce.model import create_classic_tf_model
 import ray
 import tensorflow as tf
 

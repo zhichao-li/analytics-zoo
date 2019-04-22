@@ -1,5 +1,6 @@
-from ray_poc.allreduce.sgd import ModelWorker
 import numpy as np
+
+from zoo.ray import ModelWorker
 
 vector=np.ones([10])
 result = ModelWorker.split(vector, 4)

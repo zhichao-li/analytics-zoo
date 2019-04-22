@@ -3,19 +3,14 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
-import os
-import random
 import time
-import tensorflow as tf
 
 import numpy as np
-
 import ray
 
-from ray_poc import split
-from ray_poc.allreduce.ps import ShardedParameterServer
-
-from ray_poc.allreduce.RayModel import ClassicTFRayModel, RayModel
+from zoo.ray import ClassicTFRayModel
+from zoo.ray import ShardedParameterServer
+from zoo.ray import split
 
 logger = logging.getLogger(__name__)
 

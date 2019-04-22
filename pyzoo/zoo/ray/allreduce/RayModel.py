@@ -1,8 +1,6 @@
 import tensorflow as tf
-import numpy as np
 
-from ray_poc.allreduce.tfutils import GVHelper
-from ray_poc.tfutils import TensorFlowVariables
+from zoo.ray.allreduce.tfutils import GVHelper
 
 
 class RayModel(object):

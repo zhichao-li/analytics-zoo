@@ -1,8 +1,7 @@
-import sys
-import os
-from ray_poc.mock_user import start_ray_driver, test_sgd
-from ray_poc.test.allreduce.test_resnet_yarn import test_resnet_ps
+from zoo.ray.mock_user import start_ray_driver
+
 from zoo.ray.util.spark import SparkRunner
+from zoo.ray.test.allreduce.test_resnet_yarn import test_resnet_ps
 
 # for yarn
 spark_home = "/home/zhichao/god/spark-2.4.0-bin-hadoop2.7/"
@@ -14,7 +13,7 @@ extra_pmodule_zip = "/home/zhichao/god/analytics-zoo/pyzoo.zip"
 python_loc = "/home/zhichao/anaconda3/envs/ray36/bin/python"
 
 
-from ray_poc.rayrunner import RayRunner
+from zoo import RayRunner
 spark_runner = SparkRunner(spark_home=spark_home, java_home=java_home)
 
 num_workers = 4

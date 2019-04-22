@@ -1,6 +1,4 @@
-import tensorflow as tf
-
-from ray_poc.allreduce.sgd import RayDataSet
+from zoo.ray import RayDataSet
 
 
 def classic_tf_fn():
@@ -53,8 +51,7 @@ class MnistRayDataSet(RayDataSet):
         return [[i] for i in self.sess.run([self.images, self.labels])]
 
 
-from ray_poc.allreduce.sgd import DistributedOptimizer, DummyRayDataSet
-from ray_poc.test.allreduce.model import create_classic_tf_model
+from zoo.ray_poc import DistributedOptimizer
 import ray
 import tensorflow as tf
 

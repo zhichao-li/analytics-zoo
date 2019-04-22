@@ -1,11 +1,4 @@
-import sys
-import os
-from ray_poc.mock_user import start_ray_driver, test_sgd
-from zoo.ray.util.spark import SparkRunner
-
-
-
-
+from zoo.ray import start_ray_driver
 
 # for local mode
 spark_home = "/home/lizhichao/bin/spark-2.4.0-bin-hadoop2.7/"
@@ -22,7 +15,7 @@ python_zip_file = "/home/lizhichao/bin/god/analytics-zoo/pyzoo.zip"
 # extra_pmodule_zip = "/home/zhichao/god/analytics-zoo/pyzoo.zip"
 
 
-from ray_poc.rayrunner import RayRunner
+from zoo.ray import RayRunner
 spark_runner = SparkRunner(spark_home=spark_home, java_home=java_home)
 
 num_workers = 4

@@ -1,7 +1,7 @@
 import os
 import sys
 
-from ray_poc.rayrunner import RayRunner
+from zoo.ray_poc import RayRunner
 
 SPARK_HOME = "/home/zhichao/god/spark-2.4.0-bin-hadoop2.7/"
 # SPARK_HOME = "/home/zhichao/god/zhichao/spark-2.2.0-bin-hadoop2.7/"
