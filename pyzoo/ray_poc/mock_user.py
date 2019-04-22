@@ -1,5 +1,3 @@
-
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -10,11 +8,11 @@ import ray
 from ray.experimental.sgd.sgd import DistributedSGD
 from ray.experimental.sgd.tfbench.test_model import TFBenchModel
 
-from ray_poc.util.process import session_execute
-
-
 # <class 'list'>: ['172.168.2.161:5346']
 # need to reduce the plasma memory consumption as well
+from zoo.ray.util.process import session_execute
+
+
 def start_dummy_ray_worker(redis_address, redis_password):
     num_cores = 0
     command = "nohup {} start --redis-address {} --redis-password  {} --num-cpus {} --object-store-memory {}".format(

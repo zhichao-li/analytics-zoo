@@ -4,7 +4,7 @@ import signal
 import atexit
 import sys
 
-from ray_poc.util import _gen_shutdown_per_node, is_local
+from zoo.ray.util import _gen_shutdown_per_node, is_local
 
 
 class ProcessInfo(object):

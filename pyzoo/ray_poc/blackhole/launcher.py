@@ -2,7 +2,6 @@ import os
 import sys
 
 from ray_poc.rayrunner import RayRunner
-from ray_poc.util.safe_shell_exec import get_ip_address
 
 SPARK_HOME = "/home/zhichao/god/spark-2.4.0-bin-hadoop2.7/"
 # SPARK_HOME = "/home/zhichao/god/zhichao/spark-2.2.0-bin-hadoop2.7/"

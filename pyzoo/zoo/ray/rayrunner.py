@@ -8,8 +8,8 @@ import signal
 import sys
 import itertools
 
-from zoo.ray.util import is_local
-from zoo.ray.util.process import session_execute, ProcessMonitor
+from ray_poc.util import is_local
+from ray_poc.util.process import session_execute, ProcessMonitor
 
 
 class RayContext(object):
@@ -133,15 +133,14 @@ class RayContext(object):
 
 class RayRunner(object):
     # TODO: redis_port should be retrieved by random searched
-    def __init__(self, sc, redis_port="5346", password="123456", force_purge=False):
+    def __init__(self, sc, python_loc, redis_port="5346", password="123456", force_purge=False):
         self.sc = sc
         self.executor_cores = self.get_executor_cores()
         self.num_executors = self.get_num_executors()
         self.redis_max_memory = self.sc._conf.get("spark.executor.pyspark.memory")
         # assert self.redis_max_memory, "you should set spark.executor.pyspark.memory"
-        self.python_loc = os.environ['PYSPARK_PYTHON']
         self.ray_context = RayContext(
-                                      python_loc=self.python_loc,
+                                      python_loc=python_loc,
                                       redis_port=redis_port,
                                       mkl_cores=self._get_mkl_cores(),
                                       redis_max_memory=self.redis_max_memory,
