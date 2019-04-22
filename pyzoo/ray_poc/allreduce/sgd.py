@@ -43,7 +43,7 @@ class ModelWorker(object):
         self.ray_data_set = gen_ray_data_set()
 
     # @ray.remote(num_return_vals=2)  this is for remote task not task within Actor
-    @ray.method(num_return_vals=2)  # TODO: check if we can pass parameter here.
+    #@ray.method(num_return_vals=2)  # TODO: check if we can pass parameter here.
     def set_parameters_compute_gradients(self, *parameters):
         """
         It would return a sharded grads here.
@@ -144,7 +144,7 @@ class DistributedOptimizer(object):
 
             # sharded_grad = ray.method(num_return_vals=self.num_worker)(worker.set_parameters_compute_gradients).remote(*parameters)
 
-            sharded_grad = worker.set_parameters_compute_gradients.remote(*parameters)
+            sharded_grad = worker.set_parameters_compute_gradients._remote(args=parameters, num_return_vals=self.num_worker)
             sharded_grad_ids.append(sharded_grad)
             # losses.append(loss)
             # accs.append(acc)

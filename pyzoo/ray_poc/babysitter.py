@@ -38,7 +38,7 @@ init_spark_env(spark_home) # this should happen before rayrunner
 from ray_poc.rayrunner import RayRunner
 from ray_poc.util.spark import init_spark_on_yarn, init_spark_on_local
 
-num_workers = 2
+num_workers = 4
 
 # sc, python_loc = init_spark_on_local(spark_home=spark_home,
 #                      java_home=java_home,
