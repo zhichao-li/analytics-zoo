@@ -136,6 +136,7 @@ class DistributedOptimizer(object):
         sharded_grad_ids = []
         losses = []
         accs = []
+        results = []
         # pull weights from ps
         for worker in self.workers:
             # 1) pull the latest weights from ps
@@ -155,14 +156,14 @@ class DistributedOptimizer(object):
         # print("Iteration: {}, acc is {}".format(step_id, np.mean([ray.get(acc) for acc in accs])))
 
         # TODO: performance?
-        if len(sharded_grad_ids) > 1:
-            grads_per_ps = list(zip(*sharded_grad_ids))
-            ray.get(grads_per_ps[0][0])
-            assert len(grads_per_ps[0]) == self.num_worker, "we should get correct grads for each ps"
-            # 3) push and aggregate grads on ps
-            for index, grads in enumerate(grads_per_ps):
-                self.pss[index].apply_gradients.remote(*grads)
-        else:
-            self.pss[0].apply_gradients.remote(sharded_grad_ids)
+        grads_per_ps = list(zip(*sharded_grad_ids))
+        # ray.get(grads_per_ps[0][0])
+        assert len(grads_per_ps[0]) == self.num_worker, "we should get correct grads for each ps"
+        # 3) push and aggregate grads on ps
+        for index, grads in enumerate(grads_per_ps):
+            results.append(self.pss[index].apply_gradients.remote(*grads))
+        # wait for complete
+        ray.wait(object_ids=results, num_returns=len(results))
+
 
 

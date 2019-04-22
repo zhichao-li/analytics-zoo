@@ -50,7 +50,8 @@ class ShardedParameterServer(object):
 
         _, parameters = self.sess.run([self.apply_op, self.weight_var], feed_dict={self.grad_holder: agg_grad})
         self.parameters = parameters
-        return parameters
+        # TODO: maybe we can return a metrics here.
+        return "success"
 
 
 class ShardedParameterServerForGradWeights(object):
