@@ -177,7 +177,9 @@ class RayRunner(object):
         # ray_launching_thread.start()
         # redis_address = self.result_queue.get()
         # return redis_address
-        return self._run()
+        self._run()
+        print("redis address is {}".format(self.redis_address))
+        return self
 
 
     def _run(self):
@@ -206,14 +208,24 @@ class RayRunner(object):
                           self.num_executors,
                           numSlices=self.num_executors).barrier().mapPartitions(
                 _gen_purge).collect()
+        purge()
 
-    def start_driver(self):
-        """
-        It would create a driver and a dummy local raylet
-        :return:
-        """
+
+    def _start_dummy_ray_worker(self, redis_address, redis_password, object_store_memory):
+        num_cores = 0
+        command = "nohup {} start --redis-address {} --redis-password  {} --num-cpus {} --object-store-memory {}".format(
+            "ray", redis_address, redis_password, num_cores, object_store_memory)
+        print("".format(command))
+        session_execute(command)
+
+    # TODO: convert 2000000000 to 2g
+    def start_driver(self, object_store_memory="2000000000"):
         import ray
+        self._start_dummy_ray_worker(self.redis_address, self.ray_context.password,
+                               object_store_memory=object_store_memory)
+        # TODO: we need to wait for worker ready here....
+        ray.shutdown()
         ray.init(redis_address=self.redis_address,
-                 redis_password=self.password)
+                 redis_password=self.ray_context.password)
 
 
