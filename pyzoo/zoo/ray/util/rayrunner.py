@@ -1,12 +1,8 @@
 import os
-import time
-import threading
-from pyspark import BarrierTaskContext
-import atexit
 import re
-import signal
-import sys
-import itertools
+import time
+
+from pyspark import BarrierTaskContext
 
 from zoo.ray.util import is_local
 from zoo.ray.util.process import session_execute, ProcessMonitor

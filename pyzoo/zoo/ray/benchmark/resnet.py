@@ -30,7 +30,6 @@ def classic_tf_fn():
     # Implement model interface
     loss = tf.reduce_mean(loss, name='xentropy-loss')
     optimizer = tf.train.GradientDescentOptimizer(1e-6)
-
     return loss, optimizer, inputs, logits, labels
 
 

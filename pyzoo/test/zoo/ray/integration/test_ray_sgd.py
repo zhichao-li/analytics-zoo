@@ -52,11 +52,3 @@ def test_sgd(batch_size, num_workers, grad_shard_bytes, devices_per_worker=2, st
 
     print("Peak throughput", max(sum(t[i:i + 5]) / 5 for i in range(len(t))))
 
-
-
-# # start_ray_driver(redis_address="172.168.2.156:5346")
-# start_ray_driver(redis_address="172.168.2.152:5346")
-#
-# test_sgd()
-#
-# ray.shutdown()

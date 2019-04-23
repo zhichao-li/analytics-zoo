@@ -11,10 +11,6 @@ class RayModel(object):
         self.label_ops = label_ops
         self.y_pred_ops = y_pred_ops
         # TODO: expose config here.
-        # self.sess = tf.Session(
-        #     config=tf.ConfigProto(
-        #         intra_op_parallelism_threads=1,
-        #         inter_op_parallelism_threads=1))
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
         self.loss_op = self._get_loss_op()
@@ -141,12 +137,4 @@ class ClassicTFRayModel(RayModel):
 
     def _get_optimizer(self):
         return self.optimizer
-
-
-
-class KerasTFRayModel(RayModel):
-    def __init__(self, keras_model, keras_optimizer):
-        raise Exception("not supported yet")
-
-
 

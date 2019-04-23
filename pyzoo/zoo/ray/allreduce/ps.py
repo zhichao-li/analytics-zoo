@@ -4,13 +4,11 @@ import ray
 
 @ray.remote(resources={"ps":1})
 class ShardedParameterServer(object):
-    # ray_model would automatically serde here?
     def __init__(self, parameters, gen_ray_model):
         """
         :param parameters: 1D ndarray
         :param optimizer:
         """
-        # TODO: we only need to pass a gen_optimizer here.
         ray_model = gen_ray_model()
         self.optimizer=ray_model.optimizer
 
@@ -36,7 +34,6 @@ class ShardedParameterServer(object):
         self.parameters = parameters
 
     def get_parameters(self):
-        # raise Exception("bad bad")
         return self.parameters
 
 
@@ -53,18 +50,3 @@ class ShardedParameterServer(object):
         # TODO: maybe we can return a metrics here.
         return "success"
 
-
-class ShardedParameterServerForGradWeights(object):
-    pass
-
-
-    # def aggregate_grads(self, *grads):
-    #     """
-    #     :param grads: list of sharded gradients
-    #     :return:
-    #     """
-    #     # calculate the mean of grads
-    #     grads = np.average(grads, axis=0)
-    #     # update weights
-    #     # TODO: we should have an optimizer here for that
-    #     self.parameters += grads

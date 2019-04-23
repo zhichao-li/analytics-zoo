@@ -10,7 +10,7 @@ import ray
 
 from zoo.ray.allreduce.RayModel import ClassicTFRayModel
 from zoo.ray.allreduce.ps import ShardedParameterServer
-from zoo.ray import split
+from zoo.ray.util import utils
 
 logger = logging.getLogger(__name__)
 
@@ -31,27 +31,17 @@ class DummyRayDataSet(RayDataSet):
 class ModelWorker(object):
 
     def __init__(self, gen_ray_model, gen_ray_data_set, num_workers):
-        # TODO: add a factory method for ModelWorker
-
         self.num_workers = num_workers
         self.ray_model = gen_ray_model()
         self.ray_data_set = gen_ray_data_set()
 
-    # @ray.remote(num_return_vals=2)  this is for remote task not task within Actor
-    #@ray.method(num_return_vals=2)  # TODO: check if we can pass parameter here.
+    # @ray.remote(num_return_vals=2)
     def set_parameters_compute_gradients(self, *parameters):
         """
         It would return a sharded grads here.
         Each parameter should be a 1-D vector
         """
         # concate grads
-        # print("######################33")
-        # print(type(parameters))
-        # print(type(parameters[0]))
-        # print(type(parameters[0][0]))
-        # print(parameters[0].shape)
-        # [ray.get(p) for p in ]
-
         flat_parameters = np.concatenate(parameters)
         self.ray_model.set_flat_parameters(flat_parameters)
 
@@ -61,7 +51,7 @@ class ModelWorker(object):
 
         flat_grads = np.concatenate([g.flatten() for g in grads])
         print("flat_grads {}".format(flat_grads.shape))
-        sharded_grads = split(flat_grads, self.num_workers)
+        sharded_grads = utils.split(flat_grads, self.num_workers)
         # sharded_grads = [ray.put(s) for s in sharded_grads]
         return sharded_grads
 
@@ -75,16 +65,11 @@ class DistributedOptimizer(object):
                  num_worker):
         self.num_worker = num_worker
         self.batch_size=batch_size
-        # requests = {"num_cpus": 1}
-
         self.ray_model = gen_ray_model()
-        # ModelWorkerWithResource = ray.remote(**requests)(ModelWorker)
-
         weights = self.ray_model.get_flat_parameters()
-        sharded_weights = split(weights, self.num_worker) #np.split(weights, self.num_worker)
-        # init parameters for PS, and then the modelworker can init on that version.
+        sharded_weights = utils.split(weights, self.num_worker)
+        # This weights would be used for both PS and ModelWorker
         sharded_weight_ids = [ray.put(w) for w in sharded_weights]
-
         self.workers = []
         self.pss = []
         logger.info(
@@ -150,9 +135,7 @@ class DistributedOptimizer(object):
         # print("Iteration: {}, loss is {}".format(step_id, np.mean([ray.get(loss) for loss in losses])))
         # print("Iteration: {}, acc is {}".format(step_id, np.mean([ray.get(acc) for acc in accs])))
 
-        # TODO: performance?
         grads_per_ps = list(zip(*sharded_grad_ids))
-        # ray.get(grads_per_ps[0][0])
         assert len(grads_per_ps[0]) == self.num_worker, "we should get correct grads for each ps"
         # 3) push and aggregate grads on ps
         for index, grads in enumerate(grads_per_ps):
