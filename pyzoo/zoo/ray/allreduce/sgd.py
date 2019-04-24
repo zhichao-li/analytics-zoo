@@ -8,7 +8,7 @@ import time
 import numpy as np
 import ray
 
-from zoo.ray.allreduce.RayModel import ClassicTFRayModel
+from zoo.ray.allreduce.PSOptimizer import ClassicTFRayModel
 from zoo.ray.allreduce.ps import ShardedParameterServer
 from zoo.ray.util import utils
 
@@ -56,11 +56,10 @@ class ModelWorker(object):
         return sharded_grads
 
 
-class DistributedOptimizer(object):
+class DistributedEnv(object):
 
     def __init__(self,
-                 gen_ray_model,
-                 gen_ray_data_set,
+                 train_fn,
                  batch_size,
                  num_worker):
         self.num_worker = num_worker
@@ -94,22 +93,6 @@ class DistributedOptimizer(object):
             end = time.time()
             print("Iteration: {}, throughput: {}".format(step, self.batch_size * self.num_worker / (end - start)))
 
-    @classmethod
-    def from_classic_tf(cls, model_fn, dataset_fn, batch_size, num_worker):
-
-        def ray_model_fn():
-            loss, optimizer, input, y_pred, label = model_fn()
-            ray_model = ClassicTFRayModel(loss_op=loss,
-                                          optimizer=optimizer,
-                                          input_ops=input,
-                                          label_ops=label,
-                                          y_pred_ops=y_pred,
-                                          num_worker=num_worker)
-            return ray_model
-        return cls(gen_ray_model=ray_model_fn,
-                 gen_ray_data_set=dataset_fn,
-                   batch_size=batch_size,
-                    num_worker=num_worker)
 
     def run_step(self, step_id):
         # workers of sharded_grads

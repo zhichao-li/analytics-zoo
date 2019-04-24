@@ -1,4 +1,4 @@
-from zoo.ray.allreduce.sgd  import RayDataSet
+from zoo.ray.allreduce.sgd import RayDataSet, PSOptimizer
 from ray.experimental.sgd.tfbench import model_config
 
 class MockDataset():
@@ -30,7 +30,11 @@ def classic_tf_fn():
     # Implement model interface
     loss = tf.reduce_mean(loss, name='xentropy-loss')
     optimizer = tf.train.GradientDescentOptimizer(1e-6)
-    return loss, optimizer, inputs, logits, labels
+
+    ps_optimizer = PSOptimizer(optimizer, loss)
+
+
+    # return loss, optimizer, inputs, logits, labels
 
 
 class ResNetDummyDataSet(RayDataSet):
@@ -62,7 +66,4 @@ import tensorflow as tf
 def dataset_fn():
     return ResNetDummyDataSet()
 
-# ray.init(local_mode=False, log_to_driver=True)
-#
-#
-# dopt = DistributedOptimizer.from_classic_tf(model_fn=classic_tf_fn, dataset_fn=dataset_fn, batch_size=batch_size, num_worker=2)
+

@@ -43,8 +43,20 @@ import ray
 ray.stop()
 
 
+def trainig_fn(train=False):
+    rayOptimizer = RayOptimizer(optimizer, loss_op, feed_data, train)
+    rayOptimizer.minimize()
+    return rayOptimizer
 
-# rayOptimizer = RayOptimizer(optimizer, loss_op, feed_data)
-# rayOptimizer.minimize()
+ParameterServer.init(training_fn):
+    # flag for not execute minimize
+    training_fn().rayOptimizer.getparameters()
+    start n ModelWorker
+    start n ps
+    who is responsible for trigger the training? driver would be better!!
+
+
+1) driver need to know the model definition and then get the weight and gradient
+
 
 
