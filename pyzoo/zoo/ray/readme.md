@@ -12,6 +12,7 @@ pip install psutil
 4) DownLoad Spark-2.4
 5) export PYTHONPATH=/home/lizhichao/bin/god/analytics-zoo/pyzoo/zoo.zip:$PYTHONPATH
 6) start jupyter notebook and run the following code:
+Please refer: /home/zhichao/god/analytics-zoo/pyzoo/test/zoo/ray/integration/test_yarn_ps.py
 
 ``` python
 spark_home = "/home/zhichao/god/spark-2.4.0-bin-hadoop2.7/"
@@ -36,3 +37,9 @@ RayRunner(sc).run().start_driver()
 
 ```
 
+
+# How to update the zip folder
+```
+cd $analytics-zoo/pyzoo
+zip -r zoo.zip zoo
+```

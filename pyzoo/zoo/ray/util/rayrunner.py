@@ -206,8 +206,8 @@ class RayRunner(object):
 
     def _start_dummy_ray_worker(self, redis_address, redis_password, object_store_memory):
         num_cores = 0
-        command = "{} start --redis-address {} --redis-password  {} --num-cpus {} --object-store-memory {}".format(
-            self.ray_context.get_ray_exec(), redis_address, redis_password, num_cores, object_store_memory)
+        command = "ray start --redis-address {} --redis-password  {} --num-cpus {} --object-store-memory {}".format(
+            redis_address, redis_password, num_cores, object_store_memory)
         print("".format(command))
         process_info = session_execute(command, fail_fast=True)
         ProcessMonitor.register_shutdown_hook_local(process_info.pgid)
