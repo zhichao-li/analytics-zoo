@@ -105,7 +105,6 @@ class DistributedEstimator(object):
             sharded_grad_ids.append(sharded_grad)
             # losses.append(loss)
             # accs.append(acc)
-        self.workers[0]
 
         # TODO: we don't need to print this for every iteration
         # print("Iteration: {}, loss is {}".format(step_id, np.mean([ray.get(loss) for loss in losses])))

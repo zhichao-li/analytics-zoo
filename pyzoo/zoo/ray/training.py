@@ -1,14 +1,17 @@
 import ray
 import tensorflow as tf
+import ray.services as rservices
 
-# RayDataSet only containing essential meta data to retrieve data on remote 
+# RayDataSet only containing essential meta data to retrieve data on remote
 class RayDataSet(object):
-    def __init__(self, oid, batchsize):
+    def __init__(self, ip, oid, batchsize):
+       self.ip = ip
        self.oid = oid
        self.batchsize = batchsize
 
+
     @staticmethod
-    def from_rdd(rdd_inputs_targets, redis_addr, batchsize):
+    def from_rdd(rdd_inputs_targets, redis_addr, batchsize, num_workers):
         # rdd_inputs_targets.
         # each partition should be a Array((inputs, targets))
         def fn(splitIndex, iterator):
@@ -19,9 +22,11 @@ class RayDataSet(object):
             ray.init(redis_addr)
             rows = iterator.next()
             oid = ray.put(rows)
-            return oid
-        list_of_oid = rdd_inputs_targets.mapPartitionsWithIndex(fn).collect()
-        return [RayDataSet(oid, batchsize) for oid in list_of_oid]
+            node_ip = rservices.get_node_ip_address()
+
+            return (node_ip, oid)
+        list_of_ip_oid = rdd_inputs_targets.repartition(num_workers).mapPartitionsWithIndex(fn).collect()
+        return [RayDataSet(ip=item[0], oid=item[1], batchsize=batchsize) for item in list_of_ip_oid]
 
     # inputs: tuple of ndarray
     # targets: tuple of ndarray
@@ -39,11 +44,13 @@ class RayDataSet(object):
 
 
 
-class Model(object):
+class RayModel(object):
     def __init__(self, keras_model):
         self.keras_model = keras_model
         # 1) start ps
         # 2) start worker
+
+
 
     # x = RayDataSet.from_rdd(rdd_inputs_targets, redis_addr, batchsize)
     def fit(self, x=None, batch_size=None, epoches=1, validation_data=None, workers=1):
@@ -56,9 +63,13 @@ class Model(object):
         :param workers:
         :return:
         """
-    def _step(self):
+        pass
+
+    def _step(self, x):
         # 1) control worker and ps to run a step
         # 2) batch of data would autogen from woker, not trigger by driver
+
+
 
 # ray.init()
 # import numpy as np
