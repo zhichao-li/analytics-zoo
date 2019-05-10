@@ -26,14 +26,14 @@ from zoo.ray.util.rayrunner import RayRunner
 #                                            driver_cores=num_workers + 1) # plus 1 for master
 
 # for yarn
-num_workers = 3
+num_workers =3
 
 spark_home = "/home/zhichao/god/spark-2.4.0-bin-hadoop2.7/"
 java_home = "/home/zhichao/god/jdk1.8.0_101/"
 hadoop_conf = "/home/zhichao/god/yarn35_config"
 extra_pmodule_zip = "/home/zhichao/god/analytics-zoo/pyzoo/zoo.zip"
 # spark_yarn_jars = None #"hdfs://172.168.2.181:9000/zhichao/ray/spark-2.4-jar.zip",
-# python_env_archive = "/home/zhichao/god/ray36.tar.gz"
+python_env_archive = "/home/zhichao/god/ray36.tar.gz"
 spark_runner = SparkRunner(spark_home=spark_home, java_home=java_home)
 
 sc = spark_runner.init_spark_on_yarn(
@@ -43,15 +43,16 @@ sc = spark_runner.init_spark_on_yarn(
                                     extra_pmodule_zip=extra_pmodule_zip,
                                     num_executor=num_workers + 1,
                                     executor_cores=28,
-                                    executor_memory="100g",
+                                    executor_memory="50g",
                                     driver_memory="10g",
                                     driver_cores=10,
                                     spark_executor_pyspark_memory="60g")
-RayRunner(sc).run().start_driver()
+rayrunner = RayRunner(sc, force_purge=True)
+rayrunner.run().start_driver()
 
 batch_size = 64 # NB if you want to change this you need to change classic_tf_fn as well
 train_fn, dataset_fn = gen_resnet_fn(batch_size)
-DistributedEstimator(model_fn=train_fn, dataset_fn=dataset_fn, batch_size=batch_size, num_worker=num_workers).train(10)
+DistributedEstimator(model_fn=train_fn, dataset_fn=dataset_fn, batch_size=batch_size, num_worker=num_workers).train(10000)
 
 
 

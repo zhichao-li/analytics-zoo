@@ -18,7 +18,11 @@ class ProcessInfo(object):
         self.master_addr=None
         self.node_ip=node_ip
 
-def session_execute(command, env=None, tag=None, fail_fast=False):
+def session_execute(command, env=None, tag=None, fail_fast=False, timeout=30):
+    print("-------------")
+    if env:
+        for pair in env.items():
+            print(pair)
     pro = subprocess.Popen(
         command,
         shell=True,
@@ -29,9 +33,12 @@ def session_execute(command, env=None, tag=None, fail_fast=False):
         preexec_fn=os.setsid)
     pgid = os.getpgid(pro.pid)
     print("The pgid for the current session is: {}".format(pgid))
-    out, err = pro.communicate()
+    out, err = pro.communicate(timeout=timeout)
+    print("end of communicate")
     out=out.decode("utf-8")
     err=err.decode("utf-8")  # converting bytes to string otherwise \n would not be recognized using str(err)
+    print(out)
+    print(err)
     errorcode=pro.returncode
     if errorcode != 0:
         # https://bip.weizmann.ac.il/course/python/PyMOTW/PyMOTW/docs/atexit/index.html

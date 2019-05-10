@@ -29,24 +29,25 @@ class RayContext(object):
         modified_env = os.environ.copy()
         cwd = os.getcwd()
         modified_env["PATH"] = "{}/{}:{}".format(cwd, "/".join(self.python_loc.split("/")[:-1]), os.environ["PATH"])
-        modified_env.pop("MALLOC_ARENA_MAX", None)
-        modified_env.pop("RAY_BACKEND_LOG_LEVEL", None)
-        if cores:
-            print("MKL cores is {}".format(cores))
-            modified_env.update(self.get_MKL_config(cores))
-        else:
-            # unset all MKL setting
-            modified_env.pop("intra_op_parallelism_threads")
-            modified_env.pop("inter_op_parallelism_threads")
-            modified_env.pop("OMP_NUM_THREADS")
-            modified_env.pop("KMP_BLOCKTIME")
-            modified_env.pop("KMP_AFFINITY")
-            modified_env.pop("KMP_SETTINGS")
+        # modified_env.pop("MALLOC_ARENA_MAX", None)
+        # modified_env.pop("RAY_BACKEND_LOG_LEVEL", None)
+        # # unset all MKL setting
+        # modified_env.pop("intra_op_parallelism_threads", None) # without None then there would be exception raised
+        # modified_env.pop("inter_op_parallelism_threads", None)
+        # modified_env.pop("OMP_NUM_THREADS", None)
+        # modified_env.pop("KMP_BLOCKTIME", None)
+        # modified_env.pop("KMP_AFFINITY", None)
+        # modified_env.pop("KMP_SETTINGS", None)
+        # print("cores is: {}".format(cores))
+        # if cores:
+        #     print("MKL cores is {}".format(cores))
+        #     modified_env.update(self.get_MKL_config(cores))
         # TODO: make this configurable
-        # print("Executing with these environment setting:")
+        print("Executing with these environment setting:")
         # for pair in modified_env.items():
         #     print(pair)
         # print("The command searching path is: {}".format(modified_env["PATH"]))
+        os.environ["OMP_NUM_THREADS"] = "13"
         return modified_env
 
 
@@ -62,6 +63,16 @@ class RayContext(object):
         self.labels = """--resources='{"trainer": %s, "ps": %s }' """ % (1, 1)
         print(self.labels)
 
+    def gen_stop(self):
+        def _stop(iter):
+            # TODO: print some ip info back?
+            modified_env = self.prepare_env()
+            command = "{} stop".format(self.ray_exec)
+            print("Start to end the ray services: {}".format(command))
+            session_execute(command, env=modified_env, fail_fast=True)
+            return iter
+        return _stop
+
     def start_master(self):
         """
         Start the Master for Ray
@@ -76,6 +87,7 @@ class RayContext(object):
         process_info = session_execute(command, env=modified_env, tag="ray_master")
         # TODO: we need to think serious about the time setting otherwise client would not be able to connect to the master
         time.sleep(self.WAITING_TIME_SEC)
+        print("end of start master")
         return process_info
 
     def start_raylet(self, redis_address):
@@ -89,6 +101,8 @@ class RayContext(object):
 
         modified_env = self.prepare_env(self.mkl_cores)
         time.sleep(self.WAITING_TIME_SEC)
+        session_execute("{} ".format(self.python_loc))
+        print("end of start raylet")
         return session_execute(command, env=modified_env, tag="raylet")
 
     def get_ray_exec(self):
@@ -142,7 +156,10 @@ class RayRunner(object):
                                       redis_max_memory=self.redis_max_memory,
                                       password=password)
         if force_purge:
-            self.purge_ray_processes()
+            self.sc.range(0,
+                          self.num_ray_nodes,
+                          numSlices=self.num_ray_nodes).barrier().mapPartitions(
+                self.ray_context.gen_stop()).collect()
 
     def get_mkl_cores(self):
         if "local" in self.sc.master:
@@ -186,22 +203,6 @@ class RayRunner(object):
         processMonitor = ProcessMonitor(process_infos, self.sc, ray_rdd)
         self.redis_address = processMonitor.master.master_addr
         return self.redis_address
-
-
-
-    def purge_ray_processes(self):
-        def _gen_purge(_):
-            # TODO: print some ip info back?
-            modified_env = self.prepare_env(self.master_cores)
-            command = "{} stop".format(self.ray_exec)
-            session_execute(command, env=modified_env)
-
-        def purge(_):
-            self.sc.range(0,
-                          self.num_ray_nodes,
-                          numSlices=self.num_ray_nodes).barrier().mapPartitions(
-                _gen_purge).collect()
-        purge()
 
 
     def _start_dummy_ray_worker(self, redis_address, redis_password, object_store_memory):
