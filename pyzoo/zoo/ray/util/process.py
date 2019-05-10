@@ -6,7 +6,6 @@ import sys
 
 from zoo.ray.util import gen_shutdown_per_node, is_local
 
-
 class ProcessInfo(object):
     def __init__(self, out, err, errorcode, pgid, pid=None, node_ip=None):
         self.out=out
@@ -18,11 +17,7 @@ class ProcessInfo(object):
         self.master_addr=None
         self.node_ip=node_ip
 
-def session_execute(command, env=None, tag=None, fail_fast=False, timeout=30):
-    print("-------------")
-    if env:
-        for pair in env.items():
-            print(pair)
+def session_execute(command, env=None, tag=None, fail_fast=False, timeout=120):
     pro = subprocess.Popen(
         command,
         shell=True,

@@ -29,25 +29,24 @@ class RayContext(object):
         modified_env = os.environ.copy()
         cwd = os.getcwd()
         modified_env["PATH"] = "{}/{}:{}".format(cwd, "/".join(self.python_loc.split("/")[:-1]), os.environ["PATH"])
-        # modified_env.pop("MALLOC_ARENA_MAX", None)
-        # modified_env.pop("RAY_BACKEND_LOG_LEVEL", None)
-        # # unset all MKL setting
-        # modified_env.pop("intra_op_parallelism_threads", None) # without None then there would be exception raised
-        # modified_env.pop("inter_op_parallelism_threads", None)
-        # modified_env.pop("OMP_NUM_THREADS", None)
-        # modified_env.pop("KMP_BLOCKTIME", None)
-        # modified_env.pop("KMP_AFFINITY", None)
-        # modified_env.pop("KMP_SETTINGS", None)
-        # print("cores is: {}".format(cores))
-        # if cores:
-        #     print("MKL cores is {}".format(cores))
-        #     modified_env.update(self.get_MKL_config(cores))
+        modified_env.pop("MALLOC_ARENA_MAX", None)
+        modified_env.pop("RAY_BACKEND_LOG_LEVEL", None)
+        if cores:
+            print("MKL cores is {}".format(cores))
+            modified_env.update(self.get_MKL_config(cores))
+        else:
+            # unset all MKL setting
+            modified_env.pop("intra_op_parallelism_threads")
+            modified_env.pop("inter_op_parallelism_threads")
+            modified_env.pop("OMP_NUM_THREADS")
+            modified_env.pop("KMP_BLOCKTIME")
+            modified_env.pop("KMP_AFFINITY")
+            modified_env.pop("KMP_SETTINGS")
         # TODO: make this configurable
-        print("Executing with these environment setting:")
+        # print("Executing with these environment setting:")
         # for pair in modified_env.items():
         #     print(pair)
         # print("The command searching path is: {}".format(modified_env["PATH"]))
-        os.environ["OMP_NUM_THREADS"] = "13"
         return modified_env
 
 
@@ -66,10 +65,9 @@ class RayContext(object):
     def gen_stop(self):
         def _stop(iter):
             # TODO: print some ip info back?
-            modified_env = self.prepare_env()
             command = "{} stop".format(self.ray_exec)
             print("Start to end the ray services: {}".format(command))
-            session_execute(command, env=modified_env, fail_fast=True)
+            session_execute(command, fail_fast=True)
             return iter
         return _stop
 
@@ -87,7 +85,6 @@ class RayContext(object):
         process_info = session_execute(command, env=modified_env, tag="ray_master")
         # TODO: we need to think serious about the time setting otherwise client would not be able to connect to the master
         time.sleep(self.WAITING_TIME_SEC)
-        print("end of start master")
         return process_info
 
     def start_raylet(self, redis_address):
@@ -101,8 +98,6 @@ class RayContext(object):
 
         modified_env = self.prepare_env(self.mkl_cores)
         time.sleep(self.WAITING_TIME_SEC)
-        session_execute("{} ".format(self.python_loc))
-        print("end of start raylet")
         return session_execute(command, env=modified_env, tag="raylet")
 
     def get_ray_exec(self):
