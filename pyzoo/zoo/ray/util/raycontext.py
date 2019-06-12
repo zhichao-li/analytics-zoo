@@ -191,7 +191,7 @@ class RayContext(object):
         The RayContext would init a ray cluster on top of the configuration of SparkContext.
         For spark cluster mode: The number of raylets is equal to number of executors.
         For Spark local mode: The number of raylets is controlled by local_ray_node_num.
-        CPU cores for each is raylet equals to spark_cores/local_ray_node_num.
+        CPU cores for each raylet equals to spark_cores/local_ray_node_num.
         :param sc:
         :param redis_port: redis port for the "head" node.
                The value would be randomly picked if not specified.

@@ -4,7 +4,7 @@ You need to first [install](install.md) analytics-zoo, either [from pip](install
 
 ---
 
-## **Run after pip install**
+## **Run on local node after pip install**
 
 **Important:**
 
