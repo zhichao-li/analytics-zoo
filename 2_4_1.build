@@ -1,0 +1,6 @@
+mvn clean package -DskipTests -Dspark.version=2.4.1 -Dbigdl.artifactId=bigdl-SPARK_2.4 -P spark_2.x -Dscala.version=2.12.8 -Dscala.major.version=2.12  -Dscalatest.version=3.0.3 -Dbigdl.version=0.8.0  -X
+
+# https://github.com/apache/spark/blob/v2.4.1/pom.xml
+
+# https://maven.aliyun.com/mvn/search
+

@@ -264,12 +264,7 @@
             <version>${scala.version}</version>
             <scope>${spark-scope}</scope>
         </dependency>
-        <dependency>
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-actors</artifactId>
-            <version>${scala.version}</version>
-            <scope>${spark-scope}</scope>
-        </dependency>
+
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scalap</artifactId>
