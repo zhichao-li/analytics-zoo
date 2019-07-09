@@ -18,6 +18,7 @@ from bigdl.util.common import *
 import warnings
 import multiprocessing
 import os
+import logging
 
 
 def init_spark_on_local(cores=2, conf=None, python_location=None, spark_log_level="WARN",
@@ -161,35 +162,34 @@ def get_analytics_zoo_conf():
 
 def init_env():
     # Default env
-    # kmp_affinity = "granularity=fine,compact,1,0"
-    # kmp_settings = "1"
-    # omp_num_threads = "1"
-    # kmp_blocktime = "0"
-    #
-    # # Check env and override if necessary
-    # # Currently, focused on ZOO_NUM_MKLTHREADS,
-    # # OMP_NUM_THREADS, KMP_BLOCKTIME, KMP_AFFINITY
-    # # and KMP_SETTINGS
-    # if "KMP_AFFINITY" in os.environ:
-    #     kmp_affinity = os.environ["KMP_AFFINITY"]
-    # if "KMP_SETTINGS" in os.environ:
-    #     kmp_settings = os.environ["KMP_SETTINGS"]
-    # if "OMP_NUM_THREADS" in os.environ:
-    #     omp_num_threads = os.environ["OMP_NUM_THREADS"]
-    # elif "ZOO_NUM_MKLTHREADS" in os.environ:
-    #     if os.environ["ZOO_NUM_MKLTHREADS"].lower() == "all":
-    #         omp_num_threads = multiprocessing.cpu_count()
-    #     else:
-    #         omp_num_threads = os.environ["ZOO_NUM_MKLTHREADS"]
-    # if "KMP_BLOCKTIME" in os.environ:
-    #     kmp_blocktime = os.environ["KMP_BLOCKTIME"]
-    #
-    # # Set env
-    # os.environ["KMP_AFFINITY"] = kmp_affinity
-    # os.environ["KMP_SETTINGS"] = kmp_settings
-    # os.environ["OMP_NUM_THREADS"] = omp_num_threads
-    # os.environ["KMP_BLOCKTIME"] = kmp_blocktime
-    pass
+    kmp_affinity = "granularity=fine,compact,1,0"
+    kmp_settings = "1"
+    omp_num_threads = "1"
+    kmp_blocktime = "0"
+
+    # Check env and override if necessary
+    # Currently, focused on ZOO_NUM_MKLTHREADS,
+    # OMP_NUM_THREADS, KMP_BLOCKTIME, KMP_AFFINITY
+    # and KMP_SETTINGS
+    if "KMP_AFFINITY" in os.environ:
+        kmp_affinity = os.environ["KMP_AFFINITY"]
+    if "KMP_SETTINGS" in os.environ:
+        kmp_settings = os.environ["KMP_SETTINGS"]
+    if "OMP_NUM_THREADS" in os.environ:
+        omp_num_threads = os.environ["OMP_NUM_THREADS"]
+    elif "ZOO_NUM_MKLTHREADS" in os.environ:
+        if os.environ["ZOO_NUM_MKLTHREADS"].lower() == "all":
+            omp_num_threads = multiprocessing.cpu_count()
+        else:
+            omp_num_threads = os.environ["ZOO_NUM_MKLTHREADS"]
+    if "KMP_BLOCKTIME" in os.environ:
+        kmp_blocktime = os.environ["KMP_BLOCKTIME"]
+
+    # Set env
+    os.environ["KMP_AFFINITY"] = kmp_affinity
+    os.environ["KMP_SETTINGS"] = kmp_settings
+    os.environ["OMP_NUM_THREADS"] = omp_num_threads
+    os.environ["KMP_BLOCKTIME"] = kmp_blocktime
 
 
 def init_spark_conf():
@@ -203,6 +203,10 @@ def init_spark_conf():
 
     sparkConf = SparkConf()
     sparkConf.setAll(zoo_conf.items())
+    if "BIGDL_JARS" not in os.environ:
+        logging.warn("Cannot find the jar of Analytics-Zoo from env: BIGDL_JARS")
+    else:
+        logging.info("Appending {} to driver classpath".format(os.environ.get("BIGDL_JARS")))
     if os.environ.get("BIGDL_JARS", None) and not is_spark_below_2_2():
         for jar in os.environ["BIGDL_JARS"].split(":"):
             extend_spark_driver_cp(sparkConf, jar)
