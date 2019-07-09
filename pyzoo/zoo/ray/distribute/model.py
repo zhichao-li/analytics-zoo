@@ -68,8 +68,10 @@ class KerasModelImpl(IModel, MKLSetting):
 
     def __init__(self, kerasModel, mklCores=None):
         super().__init__(cores = mklCores)
-        self.kerasModel = kerasModel
 
+        # self.kerasModel = kerasModel
+
+        self.kerasModel = kerasModel
         try:
             self.loss = kerasModel.total_loss
             self.inputs = utils.to_list(kerasModel.inputs)
@@ -81,23 +83,23 @@ class KerasModelImpl(IModel, MKLSetting):
             self.optimizer = kerasModel.optimizer
             self.sess = K.get_session()
             self.weightShapes = [v.get_shape().as_list() for v in self.trainable_vars]
-
-            ww = self.kerasModel.get_weights()
-            self.tfVariableUpdater = TFVariableUpdater(sess=self.sess, vars=self.trainable_vars + self.non_trainable_vars)
-            flat_ww = self.tfVariableUpdater.get_flat()
-            # self.tfVariableUpdater.set_flat()
-
-            self.sess = tf.compat.v1.Session(
-                config=tf.compat.v1.ConfigProto(
-                intra_op_parallelism_threads=self.get_cores(),
-                    inter_op_parallelism_threads=self.get_cores()))
-            K.set_session(self.sess)
-            self.sess.run(tf.global_variables_initializer())
-            # self.kerasModel.set_weights(ww)
-            self.tfVariableUpdater = TFVariableUpdater(sess=self.sess, vars=self.trainable_vars + self.non_trainable_vars)
-            self.tfVariableUpdater.set_flat(flat_ww)  # still testing this behavior
-            flat_ww2 = self.get_flat_weights()
-            flat_ww2
+            #
+            # ww = self.kerasModel.get_weights()
+            # self.tfVariableUpdater = TFVariableUpdater(sess=self.sess, vars=self.trainable_vars + self.non_trainable_vars)
+            # flat_ww = self.tfVariableUpdater.get_flat()
+            # # self.tfVariableUpdater.set_flat()
+            #
+            # self.sess = tf.compat.v1.Session(
+            #     config=tf.compat.v1.ConfigProto(
+            #     intra_op_parallelism_threads=self.get_cores(),
+            #         inter_op_parallelism_threads=self.get_cores()))
+            # K.set_session(self.sess)
+            # self.sess.run(tf.global_variables_initializer())
+            # # self.kerasModel.set_weights(ww)
+            # self.tfVariableUpdater = TFVariableUpdater(sess=self.sess, vars=self.trainable_vars + self.non_trainable_vars)
+            # self.tfVariableUpdater.set_flat(flat_ww)  # still testing this behavior
+            # flat_ww2 = self.get_flat_weights()
+            # flat_ww2
 
             self.tfVariableUpdater = TFVariableUpdater(sess=self.sess, vars=self.trainable_vars)
 
@@ -163,39 +165,6 @@ class KerasModelImpl(IModel, MKLSetting):
         self.kerasModel.save(model_path)
 
 
-
-
-class ModelAdapter(MKLSetting):
-
-    def __init__(self, inputs,
-                 outputs,
-                 targets,
-                 loss,
-                 optimizer,
-                 grad_vars,
-                 cores=None):
-        super().__init__(cores)
-        self.inputs = inputs
-        self.outputs = outputs
-        self.targets = targets
-        self.loss = loss
-        self.optimizer = optimizer
-        self.sess = tf.keras.backend.get_session()
-
-        self.sess.run(tf.global_variables_initializer())
-
-    def calc_accuracy(sess, inputs_op, outputs_op, targets_op, input_data, output_data):
-        with tf.name_scope('accuracy'):
-            # label [-1, 1] not one-hot encoding. If the shape mismatch, the result would be incorrect
-            # as `tf.equal` would broadcast automatically during the comparing stage.
-            correct_prediction = tf.equal(tf.argmax(outputs_op[0], 1),
-                                          tf.cast(tf.reshape(targets_op[0], (-1,)), tf.int64))
-            correct_prediction = tf.cast(correct_prediction, tf.float32)
-            accuracy = tf.reduce_mean(correct_prediction)
-            return sess.run(accuracy,
-                            feed_dict={targets_op[0]: output_data, inputs_op[0]: input_data})
-
-
 class ModelLite(object):
     def __init__(self, keras_model_bytes=None, model_fn=None):
         self.keras_model_bytes = keras_model_bytes
@@ -248,5 +217,6 @@ class ModelLite(object):
         finally:
             # TODO: remove file here
             pass
+
 
 
