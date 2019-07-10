@@ -62,6 +62,7 @@ def __prepare_spark_env():
         if pyspark not in sys.path:
             sys.path.insert(0, pyspark)
 
+analytics_zoo_classpath = None
 
 def __prepare_analytics_zoo_env():
     jar_dir = os.path.abspath(__file__ + "/../../")
@@ -78,7 +79,7 @@ def __prepare_analytics_zoo_env():
             os.environ[env_var_name] = path
 
     if analytics_zoo_classpath:
-        append_path("BIGDL_JARS", analytics_zoo_classpath)
+        append_path("ZOO_JARS", analytics_zoo_classpath)
 
     if conf_paths:
         assert len(conf_paths) == 1, "Expecting one conf, but got: %s" % len(conf_paths)
@@ -92,9 +93,9 @@ def __prepare_analytics_zoo_env():
                 print("Prepending %s to sys.path" % resource)
                 sys.path.insert(0, resource)
 
-    if os.environ.get("BIGDL_JARS", None) and is_spark_below_2_2():
-        for jar in os.environ["BIGDL_JARS"].split(":"):
-            append_path("SPARK_CLASSPATH", jar)
+    # if os.environ.get("BIGDL_JARS", None) and is_spark_below_2_2():
+    #     for jar in os.environ["BIGDL_JARS"].split(":"):
+    #         append_path("SPARK_CLASSPATH", jar)
 
     if os.environ.get("BIGDL_PACKAGES", None):
         for package in os.environ["BIGDL_PACKAGES"].split(":"):
@@ -106,8 +107,8 @@ def get_analytics_zoo_classpath():
     """
     Get and return the jar path for analytics-zoo if exists.
     """
-    if os.getenv("BIGDL_CLASSPATH"):
-        return os.environ["BIGDL_CLASSPATH"]
+    if os.getenv("ZOO_CLASSPATH"):
+        return os.environ["ZOO_CLASSPATH"]
     jar_dir = os.path.abspath(__file__ + "/../../")
     jar_paths = glob.glob(os.path.join(jar_dir, "share/lib/*.jar"))
     if jar_paths:

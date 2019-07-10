@@ -203,12 +203,12 @@ def init_spark_conf():
 
     sparkConf = SparkConf()
     sparkConf.setAll(zoo_conf.items())
-    if "BIGDL_JARS" not in os.environ:
-        logging.warn("Cannot find the jar of Analytics-Zoo from env: BIGDL_JARS")
+    if "ZOO_JARS" not in os.environ:
+        logging.warn("Cannot find the jar of Analytics-Zoo from env: ZOO_JARS")
     else:
         logging.info("Appending {} to driver classpath".format(os.environ.get("BIGDL_JARS")))
-    if os.environ.get("BIGDL_JARS", None) and not is_spark_below_2_2():
-        for jar in os.environ["BIGDL_JARS"].split(":"):
+    if os.environ.get("ZOO_JARS", None) and not is_spark_below_2_2():
+        for jar in os.environ["ZOO_JARS"].split(":"):
             extend_spark_driver_cp(sparkConf, jar)
 
     # add content in PYSPARK_FILES in spark.submit.pyFiles
