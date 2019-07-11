@@ -93,7 +93,9 @@ class RayServiceFuncGenerator(object):
 
     def __init__(self, python_loc, redis_port, ray_node_cpu_cores, mkl_cores,
                  password, object_store_memory, waitting_time_sec=6, verbose=False, env=None,
-                 extra_params=None, trainer_per_node=None, ps_per_node=None):
+                 extra_params=None,
+                 device_per_node=None,
+                 trainer_per_node=None, ps_per_node=None):
         """object_store_memory: integer in bytes"""
         self.env = env
         self.python_loc = python_loc
@@ -106,6 +108,7 @@ class RayServiceFuncGenerator(object):
         self.waiting_time_sec = waitting_time_sec
         self.extra_params = extra_params
         self.verbose = verbose
+        self.device_per_node = device_per_node if not device_per_node else 1
         self.trainer_per_node = trainer_per_node if not trainer_per_node else 1
         self.ps_per_node = ps_per_node if not ps_per_node else 1
         self.labels = """--resources='{"trainer": %s, "ps": %s }' """ % (trainer_per_node,
@@ -189,7 +192,10 @@ class RayServiceFuncGenerator(object):
 class RayContext(object):
     def __init__(self, sc, redis_port=None, password="123456", object_store_memory=None,
                  verbose=False, env=None, local_ray_node_num=2, waiting_time_sec=8,
-                 extra_params=None, trainer_per_node=None, ps_per_node=None):
+                 extra_params=None,
+                 device_per_node=None,
+                 trainer_per_node=None,
+                 ps_per_node=None):
         """
         The RayContext would init a ray cluster on top of the configuration of SparkContext.
         For spark cluster mode: The number of raylets is equal to number of executors.
@@ -228,6 +234,7 @@ class RayContext(object):
             env=env,
             waitting_time_sec=waiting_time_sec,
             extra_params=extra_params,
+            device_per_node=device_per_node,
             trainer_per_node=trainer_per_node,
             ps_per_node=ps_per_node)
         self._gather_cluster_ips()

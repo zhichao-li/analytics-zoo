@@ -72,6 +72,8 @@ class KerasModelImpl(IModel, MKLSetting):
         # self.kerasModel = kerasModel
 
         self.kerasModel = kerasModel
+        K.set_learning_phase(1) # 1 FOR TRAINING
+
         try:
             self.loss = kerasModel.total_loss
             self.inputs = utils.to_list(kerasModel.inputs)
@@ -156,6 +158,8 @@ class KerasModelImpl(IModel, MKLSetting):
         return K.batch_get_value(self.trainable_vars)
 
     def evaluate(self, inputs, targets):
+        print("changing phase to test")
+        K.set_learning_phase(0)
         metrics_tensors = [
             self.kerasModel._all_metrics_tensors[m] for m in self.kerasModel.metrics_names[1:]
         ]

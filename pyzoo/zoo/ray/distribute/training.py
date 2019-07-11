@@ -59,7 +59,7 @@ class RayModel(object):
             self.step(i)
             if i % 1000 == 0:
                 self.modelAdapter.set_flat_trainable_weights(
-                    ray.get(self.workers[0].get_flat_weights.remote()))
+                    ray.get(self.workers[0].get_flat_trainable_weights.remote()))
                 self.modelAdapter.save("/opt/work/benchmark/resnet-cifar10-{}".format(i))
                 print("acc: {}".format(
                     self.evaluate(x=val_x,
