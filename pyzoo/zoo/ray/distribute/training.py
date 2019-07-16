@@ -64,6 +64,8 @@ class RayModel(object):
                 print("acc: {}".format(
                     self.evaluate(x=val_x,
                                       batch_size=10000))) # batch size?
+        self.modelAdapter.set_flat_trainable_weights(
+            ray.get(self.workers[0].get_flat_trainable_weights.remote()))
         return self
 
     def _preprocess_input(self, x, y, batch_size=None, repeat=True, shuffle=True):
