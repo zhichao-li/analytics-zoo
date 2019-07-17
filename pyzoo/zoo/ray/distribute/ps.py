@@ -68,7 +68,7 @@ class ShardedParameterServer(MKLSetting):
         :return: updated weights
         """
         # TODO: MKL here?
-        agg_grad = np.mean(gradients, axis=0)
+        agg_grad = np.mean(gradients, axis=0).reshape(self.parameters.shape)
         _, parameters = self.sess.run([self.apply_op, self.weight_var], feed_dict={self.grad_holder: agg_grad})
         self.parameters = parameters
         return "success"

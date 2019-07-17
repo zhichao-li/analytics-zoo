@@ -48,15 +48,18 @@ class RayModel(object):
 
     # TODO: refine val_x, it only accept RayDataset for now
     # how to resume training? reuse some tf existing api?
-    def fit(self, x, num_worker, batch_size, y=None, val_x=None, steps=10, strategy="ps"):
+    def fit(self, x, num_worker, batch_size, y=None, val_x=None, steps=10,
+            model_per_node=1,
+            strategy="ps"):
         self.batch_size = batch_size
         self.strategy=strategy
         self.num_worker = num_worker
+        self.model_per_node = model_per_node
         self.modelAdapter = self.model_lite.to_adapter()
         self.x = self._preprocess_input(x, y)
         self._init_distributed_engine()
         for i in range(1, steps + 1):
-            self.step(i)
+            self.step2(i)
             if i % 1000 == 0:
                 self.modelAdapter.set_flat_trainable_weights(
                     ray.get(self.workers[0].get_flat_trainable_weights.remote()))
@@ -107,28 +110,99 @@ class RayModel(object):
         return [r / count for r in result]
 
     def _init_distributed_engine(self):
-        weights = utils.flatten(self.modelAdapter.get_trainable_weights())
-        sharded_weights = utils.split(weights, self.num_worker)
-        # This weights would be used for both PS and ModelWorker
-        sharded_weight_ids = [ray.put(w) for w in sharded_weights]
+
         self.workers = []
         self.pss = []
         logger.info(
             "Creating parameter server ({} total)".format(
                 self.num_worker))
 
-        for ps_index in range(self.num_worker):
+        logger.info(
+            "Creating model workers ({} total)".format(
+                self.num_worker))
+        for worker_index in range(self.num_worker * self.model_per_node):
+            self.workers.append(
+                ModelWorker.remote(self.model_lite, self.x))
+        self.ip_to_worker = {}
+
+        for worker in self.workers:
+            ip = ray.get(worker.ip.remote())
+            if ip not in self.ip_to_worker:
+                self.ip_to_worker[ip] = []
+            self.ip_to_worker.get(ip).append(worker)
+
+        weights = utils.flatten(self.modelAdapter.get_trainable_weights())
+        sharded_weights = utils.split(weights, len(self.ip_to_worker.keys())) # TODO: combine the num of pss into one var
+        # This weights would be used for both PS and ModelWorker
+        sharded_weight_ids = [ray.put(w) for w in sharded_weights]
+
+        for ps_index in range(len(self.ip_to_worker.keys())):
             self.pss.append(
                 ShardedParameterServer.remote(sharded_weight_ids[ps_index],
                                               modelLite=self.model_lite,
                                               ))
+        self._set_split_number_for_workers()
 
-        logger.info(
-            "Creating model workers ({} total)".format(
-                self.num_worker))
-        for worker_index in range(self.num_worker):
-            self.workers.append(
-                ModelWorker.remote(self.model_lite, self.x, self.num_worker))
+    def _set_split_number_for_workers(self):
+        self.ip_to_num_workers = {}
+        result = []
+        for ip in self.ip_to_worker.keys():
+            num = len(self.ip_to_worker.get(ip))
+            self.ip_to_num_workers[ip] = num
+            for worker in self.ip_to_worker.get(ip):
+                result.append(worker.set_num_ps.remote(len(self.pss)))
+                result.append(worker.set_num_models_per_node.remote(num))
+        ray.wait(result, num_returns=len(result))
+
+
+    def step2(self, step_id):
+        start = time.time()
+        # workers of sharded_grads
+        sharded_grad_ids = []
+        results = []
+        losses = []
+
+        co_agg_tasks = []
+        for ip in self.ip_to_worker.keys():
+            co_workers = self.ip_to_worker.get(ip)
+            grads_tmp = [] # [[g0, g1], [g0, g1]]
+            for worker in co_workers:
+                # 1) pull the latest weights from ps
+                parameters = [ps.pull.remote() for ps in self.pss]
+                # 2) compute the grads
+                sharded_grad = worker.pull_and_execute._remote(args=parameters, kwargs=None,
+                                                               num_return_vals=self.ip_to_num_workers.get(ip))  # returning is #ps , not #models
+                grads_tmp.append(utils.to_list(sharded_grad))
+                losses.append(worker.get_loss.remote())
+            if len(grads_tmp) == 1:
+                grads_per_worker = grads_tmp
+            else:
+                grads_per_worker = list(zip(*grads_tmp)) # [(g0, g0), (g1, g1)]
+            for index, grads in enumerate(grads_per_worker):
+                co_agg_tasks.append(co_workers[index].push.remote(*grads))
+        ray.wait(object_ids=co_agg_tasks, num_returns=len(co_agg_tasks))
+
+        for ip in self.ip_to_worker.keys():
+            workers = self.ip_to_worker.get(ip)
+            grads = [worker.pull.remote() for worker in workers] # [g0, g1, g2]
+            # The first worker of a node is responsible for concat and re-split the grads
+            resharded_grads = workers[0].concate_and_split._remote(args=grads,
+                                                                   kwargs=None, num_return_vals=len(self.pss))
+            sharded_grad_ids.append(utils.to_list(resharded_grads)) # ([g0, g1, g2], [g0, g1, g2])
+        if len(sharded_grad_ids) == 1:
+            grads_per_ps = sharded_grad_ids
+        else:
+            grads_per_ps = list(zip(*sharded_grad_ids))
+        assert len(grads_per_ps[0]) == len(self.pss), "{} == {}".format(len(grads_per_ps[0]), len(self.pss))
+        # 3) push and aggregate grads on ps
+        for index, grads in enumerate(grads_per_ps):
+            results.append(self.pss[index].push.remote(*grads))
+        # wait for complete
+        ray.wait(object_ids=results, num_returns=len(results))
+        end = time.time()
+        avg_loss = np.mean([ray.get(loss) for loss in losses])
+        throughput = self.batch_size / (end - start)
+        print("Iteration: {}, throughput: {}, loss: {}".format(step_id, throughput, avg_loss))
 
 
     def step(self, step_id):

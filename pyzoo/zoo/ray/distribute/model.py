@@ -168,7 +168,6 @@ class KerasModelImpl(IModel, MKLSetting):
     def save(self, model_path):
         self.kerasModel.save(model_path)
 
-
 class ModelLite(object):
     def __init__(self, keras_model_bytes=None, model_fn=None):
         self.keras_model_bytes = keras_model_bytes

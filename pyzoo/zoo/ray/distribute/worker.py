@@ -26,11 +26,44 @@ from zoo.ray.util import utils
 
 @ray.remote(resources={"trainer":1})
 class ModelWorker(object):
-    def __init__(self, modelLite, ray_data_set, num_workers):
-        self.num_workers = num_workers
+    def __init__(self, modelLite, ray_data_set):
         self.modelAdapter = modelLite.to_adapter()
         self.ray_data_set = ray_data_set.action()
         self.loss = 0
+        self.gradient = None
+        self.training_grads = None
+        # TODO: Move this to remote function
+        self.num_ps = None
+        self.num_models_per_node=None
+    def get_num_ps(self):
+        return self.num_ps
+
+    def get_num_models_per_node(self):
+        return self.num_models_per_node
+
+
+    def set_num_ps(self, num_ps):
+        self.num_ps = num_ps
+
+    def set_num_models_per_node(self, num):
+        self.num_models_per_node=num
+
+    def pull(self):
+        return self.gradient
+
+    def push(self, *gradients):
+        self.gradient = np.mean(gradients, axis=0)
+        return 0
+
+    # TODO: pass in num_splits here.
+    def concate_and_split(self, *gradients):
+        flat_grads = np.concatenate(gradients)
+        return utils.split(flat_grads, self.num_ps)
+
+
+    def ip(self):
+        import ray.services as rservices
+        return rservices.get_node_ip_address()
 
     # @ray.remote(num_return_vals=2)
     def pull_and_execute(self, *parameters):
@@ -46,12 +79,15 @@ class ModelWorker(object):
         loss_gradients = self.modelAdapter.execute(utils.to_list(input_data),
                                                    utils.to_list(label_data))
         self.loss = loss_gradients[0]
-        grads = loss_gradients[1:]
+        self.training_grads = loss_gradients[1:]
         print("loss is {}".format(self.loss))
-        flat_grads = np.concatenate([g.flatten() for g in grads])
+        flat_grads = np.concatenate([g.flatten() for g in self.training_grads])
         print("flat_grads {}".format(flat_grads.shape))
-        sharded_grads = utils.split(flat_grads, self.num_workers)
+        sharded_grads = utils.split(flat_grads, self.num_models_per_node)
         return sharded_grads
+
+
+    # def pull_and_execute(self, ):
 
     def get_loss(self):
         # TODO: this should be combined with set_parameters_compute_gradients, but we cannot return
