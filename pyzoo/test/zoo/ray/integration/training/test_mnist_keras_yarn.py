@@ -2,9 +2,10 @@ import ray
 import tensorflow as tf
 import numpy as np
 
-
+from zoo import init_spark_on_yarn
 from zoo.ray.data.dataset import RayDataSet
 from zoo.ray.distribute.training import RayModel
+from zoo.ray.util.raycontext import RayContext
 
 images = tf.keras.layers.Input((28, 28, 1))
 target = tf.keras.layers.Input((1, ))
@@ -22,11 +23,35 @@ keras_model.compile(loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
 # keras_model.save("/opt/work/tt.model")
 
-num_worker = 1
+num_worker = 4
 model_per_node = 3
-resource={"trainer": num_worker * model_per_node, "ps": num_worker }
-ray.init(local_mode=False, log_to_driver=True, resources=resource)
-batch_size = 128
+slave_num = num_worker + 1
+total_batch = 128 * num_worker * model_per_node
+# resource={"trainer": num_worker * model_per_node, "ps": num_worker }
+# ray.init(local_mode=False, log_to_driver=True, resources=resource)
+
+sc = init_spark_on_yarn(
+    hadoop_conf="/opt/work/almaren-yarn-config/",
+    conda_name="ray_train",
+    num_executor=slave_num,
+    executor_cores=88,
+    executor_memory="100g",
+    driver_memory="20g",
+    driver_cores=22,
+    extra_executor_memory_for_ray="20g",
+    spark_conf={"hello": "world"})
+
+ray_ctx = RayContext(sc=sc,
+                     object_store_memory="20g",
+                     extra_params={"temp-dir": "/tmp/hello/"},
+                     trainer_per_node=model_per_node, ps_per_node=1,
+                     env={"http_proxy": "http://child-prc.intel.com:913",
+                          "http_proxys": "http://child-prc.intel.com:913"})
+# ray_ctx.init()
+ray_ctx._start_cluster()
+ray_ctx._start_driver(object_store_memory="50g")
+
+
 
 mnist = tf.keras.datasets.mnist
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -44,7 +69,7 @@ rayModel.fit(x=x_train,
              y=y_train,
              num_worker=num_worker,
              model_per_node=model_per_node,
-             batch_size=128,
+             batch_size=total_batch,
              steps=400,
              strategy="ps")
 

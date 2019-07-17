@@ -172,7 +172,7 @@ class RayModel(object):
                 # 2) compute the grads
                 sharded_grad = worker.pull_and_execute._remote(args=parameters, kwargs=None,
                                                                num_return_vals=self.ip_to_num_workers.get(ip))  # returning is #ps , not #models
-                grads_tmp.append(utils.to_list(sharded_grad))
+                grads_tmp.append(sharded_grad)
                 losses.append(worker.get_loss.remote())
             if len(grads_tmp) == 1:
                 grads_per_worker = grads_tmp
