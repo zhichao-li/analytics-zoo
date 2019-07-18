@@ -120,7 +120,7 @@ class RayModel(object):
         logger.info(
             "Creating model workers ({} total)".format(
                 self.num_worker))
-        for worker_index in range(self.num_worker * self.model_per_node):
+        for worker_index in range(self.num_worker):
             self.workers.append(
                 ModelWorker.remote(self.model_lite, self.x))
         self.ip_to_worker = {}
