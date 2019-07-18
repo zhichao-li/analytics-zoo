@@ -181,7 +181,8 @@ class RayModel(object):
             for index, grads in enumerate(grads_per_worker):
                 co_agg_tasks.append(co_workers[index].push.remote(*grads))
         ray.wait(object_ids=co_agg_tasks, num_returns=len(co_agg_tasks))
-
+        local_end = time.time()
+        print("local aggregation: {}".format(local_end - start))
         for ip in self.ip_to_worker.keys():
             workers = self.ip_to_worker.get(ip)
             grads = [worker.pull.remote() for worker in workers] # [g0, g1, g2]
@@ -202,6 +203,7 @@ class RayModel(object):
         end = time.time()
         avg_loss = np.mean([ray.get(loss) for loss in losses])
         throughput = self.batch_size / (end - start)
+        print("across aggregate: {}".format(end - local_end))
         print("Iteration: {}, throughput: {}, loss: {}".format(step_id, throughput, avg_loss))
 
 
