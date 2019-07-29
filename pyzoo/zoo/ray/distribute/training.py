@@ -48,14 +48,14 @@ class RayModel(object):
 
     # TODO: refine val_x, it only accept RayDataset for now
     # how to resume training? reuse some tf existing api?
-    def fit(self, x, num_worker, batch_size, y=None, val_x=None, steps=10,
+    def fit(self, x, num_nodes, batch_size, y=None, val_x=None, steps=10,
             model_per_node=1,
             strategy="ps"):
         self.batch_size = batch_size
         self.strategy=strategy
-        self.num_nodes = num_worker
+        self.num_nodes = num_nodes
         # TODO: change the name of num_worker to num_nodes
-        self.num_worker = num_worker * model_per_node
+        self.num_worker = num_nodes * model_per_node
         self.model_per_node = model_per_node
         self.modelAdapter = self.model_lite.to_adapter()
         self.x = self._preprocess_input(x, y)
@@ -161,7 +161,6 @@ class RayModel(object):
         sharded_grad_ids = []
         results = []
         losses = []
-
         co_agg_tasks = []
         for ip in self.ip_to_worker.keys():
             co_workers = self.ip_to_worker.get(ip)
@@ -169,10 +168,11 @@ class RayModel(object):
 
             # 1) pull the latest weights from ps
             parameters = [ps.pull.remote() for ps in self.pss]
+            num_co_workers = len(co_workers)
             for worker in co_workers:
                 # 2) compute the grads
                 sharded_grad = worker.pull_and_execute._remote(args=parameters, kwargs=None,
-                                                               num_return_vals=self.ip_to_num_workers.get(ip))  # returning is #ps , not #models
+                                                               num_return_vals=num_co_workers)  # returning is #ps , not #models
                 grads_tmp.append(sharded_grad)
                 losses.append(worker.get_loss.remote())
             if len(grads_tmp) == 1:

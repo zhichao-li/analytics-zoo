@@ -42,8 +42,12 @@ class TFDataSetWrapper(RayDataSet):
         self.init = True
         self.tf_dataset = self.input_fn()
         self.session = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(
-            intra_op_parallelism_threads=22, inter_op_parallelism_threads=22))
+            intra_op_parallelism_threads=10, inter_op_parallelism_threads=10))
+        iterator = self.tf_dataset.make_initializable_iterator()
+        self.session.run(iterator.initializer)
+        self.x, self.y = iterator.get_next()
         self.x, self.y = self.tf_dataset.make_one_shot_iterator().get_next()
+        # self.x, self.y = self.tf_dataset.make_one_shot_iterator().get_next()
         return self
 
     def next_batch(self):

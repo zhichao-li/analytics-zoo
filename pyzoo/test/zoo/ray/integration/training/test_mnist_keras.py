@@ -22,11 +22,11 @@ keras_model.compile(loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
 # keras_model.save("/opt/work/tt.model")
 
-num_worker = 3
-model_per_node = 1
-resource={"trainer": num_worker * model_per_node, "ps": num_worker }
+num_nodes = 1
+model_per_node = 2
+resource={"trainer": num_nodes * model_per_node, "ps": num_nodes }
 ray.init(local_mode=False, log_to_driver=True, resources=resource)
-batch_size = num_worker * model_per_node
+batch_size = 128 * num_nodes * model_per_node
 
 mnist = tf.keras.datasets.mnist
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -42,9 +42,9 @@ rayModel = RayModel.from_keras_model(keras_model)
 
 rayModel.fit(x=x_train,
              y=y_train,
-             num_worker=num_worker,
+             num_nodes=num_nodes,
              model_per_node=model_per_node,
-             batch_size=128,
+             batch_size=batch_size,
              steps=400,
              strategy="ps")
 
