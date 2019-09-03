@@ -79,11 +79,13 @@ class RayModel(object):
             #TODO: list of inputs
             if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
                 def dataset_fn():
+                    print("start to create dataset")
                     dataset = tf.data.Dataset.from_tensor_slices((x, y)).batch(batch_size)
                     if repeat:
                         dataset = dataset.repeat()
                     if shuffle:
                         dataset = dataset.shuffle(buffer_size= 4 * batch_size)
+                    print("end of creating dataset")
                     return dataset
                 return RayDataSet.from_dataset_generator(
                     input_fn=dataset_fn)

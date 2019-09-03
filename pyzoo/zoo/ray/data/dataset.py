@@ -46,7 +46,9 @@ class TFDataSetWrapper(RayDataSet):
         iterator = self.tf_dataset.make_initializable_iterator()
         self.session.run(iterator.initializer)
         self.x, self.y = iterator.get_next()
+        print("start of one shot")
         self.x, self.y = self.tf_dataset.make_one_shot_iterator().get_next()
+        print("end of one shot")
         # self.x, self.y = self.tf_dataset.make_one_shot_iterator().get_next()
         return self
 
