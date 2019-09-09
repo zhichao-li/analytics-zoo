@@ -19,6 +19,7 @@ import numpy as np
 import ray
 import os
 import logging
+import time
 
 from zoo.ray.util.utils import MKLSetting
 from zoo.ray.util import utils
@@ -68,9 +69,14 @@ class ShardedParameterServer(MKLSetting):
         :return: updated weights
         """
         # TODO: MKL here?
-        print(np.mean(gradients, axis=0).shape)
-        print(self.parameters.shape)
+        #print(np.mean(gradients, axis=0).shape)
+        mean_start = time.time()
         agg_grad = np.mean(gradients, axis=0).reshape(self.parameters.shape)
+        mean_end = time.time()
         _, parameters = self.sess.run([self.apply_op, self.weight_var], feed_dict={self.grad_holder: agg_grad})
         self.parameters = parameters
+        apply_grads_end = time.time()
+        print(self.parameters.shape)
+        print("Time for ps mean grads: {}".format(mean_end - mean_start))
+        print("Time for ps apply_grads: {}".format(apply_grads_end - mean_end))
         return "success"

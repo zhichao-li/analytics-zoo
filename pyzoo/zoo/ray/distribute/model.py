@@ -22,6 +22,7 @@ import time
 import numpy as np
 import ray
 import tensorflow as tf
+import tensorflow
 
 from zoo.ray.data.dataset import RayDataSet
 from zoo.ray.distribute.ps import ShardedParameterServer
@@ -29,7 +30,8 @@ from zoo.ray.distribute.tfvariableupdater import TFVariableUpdater
 from zoo.ray.distribute.worker import ModelWorker
 from zoo.ray.util import utils
 from zoo.ray.util.utils import MKLSetting, unflatten
-import tensorflow.keras.backend as K
+# import tensorflow.keras.backend as K
+# import tensorflow.keras.backend as backend
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,15 @@ class KerasModelImpl(IModel, MKLSetting):
         # self.kerasModel = kerasModel
 
         self.kerasModel = kerasModel
-        K.set_learning_phase(1) # 1 FOR TRAINING
+        tensorflow.keras.backend.set_learning_phase(1) # 1 FOR TRAINING
+        # K.clear_session()
+        # K.get_session().close()
+        # self.sess = tf.compat.v1.Session(
+        #     config=tf.compat.v1.ConfigProto(
+        #         intra_op_parallelism_threads=1,
+        #         inter_op_parallelism_threads=1))
+        # K.set_session(self.sess)
+        # tf.reset_default_graph()
 
         try:
             self.loss = kerasModel.total_loss
@@ -81,9 +91,12 @@ class KerasModelImpl(IModel, MKLSetting):
             self.trainable_vars = kerasModel.trainable_weights
             self.non_trainable_vars = kerasModel.non_trainable_weights
 
-            self.grads = K.gradients(self.loss, self.trainable_vars)
+            self.grads = tensorflow.keras.backend.gradients(self.loss, self.trainable_vars)
             self.optimizer = kerasModel.optimizer
-            self.sess = K.get_session()
+
+
+            self.sess = tensorflow.keras.backend.get_session()
+
             self.weightShapes = [v.get_shape().as_list() for v in self.trainable_vars]
             #
             # ww = self.kerasModel.get_weights()
@@ -155,11 +168,11 @@ class KerasModelImpl(IModel, MKLSetting):
         """
         :return: list of ndarray
         """
-        return K.batch_get_value(self.trainable_vars)
+        return tensorflow.keras.backend.batch_get_value(self.trainable_vars)
 
     def evaluate(self, inputs, targets):
         print("changing phase to test")
-        K.set_learning_phase(0)
+        tensorflow.keras.backend.set_learning_phase(0)
         metrics_tensors = [
             self.kerasModel._all_metrics_tensors[m] for m in self.kerasModel.metrics_names[1:]
         ]
@@ -201,7 +214,8 @@ class ModelLite(object):
         # TODO: remove file and add more exception handling
         except Exception as e:
             raise e
-        loaded_model = tf.keras.models.load_model(model_path)
+        import tensorflow
+        loaded_model = tf.keras.models.load_model(model_path, custom_objects={'tf': tf})
         return loaded_model
 
         import pickle

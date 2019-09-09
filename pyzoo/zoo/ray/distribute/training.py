@@ -20,6 +20,8 @@ import numpy as np
 import ray
 import tensorflow as tf
 import logging
+from collections.abc import Iterable
+
 
 from zoo.ray.data.dataset import RayDataSet
 from zoo.ray.distribute.model import ModelLite
@@ -177,14 +179,22 @@ class RayModel(object):
                                                                num_return_vals=num_co_workers)  # returning is #ps , not #models
                 grads_tmp.append(sharded_grad)
                 losses.append(worker.get_loss.remote())
-            if len(grads_tmp) == 1:
+            if len(grads_tmp) == 1:  # only one node
                 grads_per_worker = grads_tmp
-            else:
+            else:  # TODO: support multi node and single model (single model would throw exception for now.)
                 grads_per_worker = list(zip(*grads_tmp)) # [(g0, g0), (g1, g1)]
+            # print("grads ####")
+            # print("ip #### %s" % ip) # 4node 2model ==> error 2, 2, 1, 1, 2
+            # print(grads_per_worker)
+            # One model per node
+            if not isinstance(grads_per_worker[0], Iterable):
+                grads_per_worker = [[grads] for grads in grads_per_worker]
             for index, grads in enumerate(grads_per_worker):
                 co_agg_tasks.append(co_workers[index].push.remote(*grads))
+        before_local_wait = time.time()
         ray.wait(object_ids=co_agg_tasks, num_returns=len(co_agg_tasks))
         local_end = time.time()
+        print("local aggregation waiting: {}".format(local_end - before_local_wait))
         print("local aggregation: {}".format(local_end - start))
         for ip in self.ip_to_worker.keys():
             workers = self.ip_to_worker.get(ip)
@@ -201,11 +211,14 @@ class RayModel(object):
         # 3) push and aggregate grads on ps
         for index, grads in enumerate(grads_per_ps):
             results.append(self.pss[index].push.remote(*grads))
+        before_wait = time.time()
         # wait for complete
         ray.wait(object_ids=results, num_returns=len(results))
         end = time.time()
         avg_loss = np.mean([ray.get(loss) for loss in losses])
         throughput = self.batch_size / (end - start)
+        print("total time: {}".format(end -start))
+        print("across aggregate waitting time:{}".format(end - before_wait))
         print("across aggregate: {}".format(end - local_end))
         print("Iteration: {}, throughput: {}, loss: {}".format(step_id, throughput, avg_loss))
 

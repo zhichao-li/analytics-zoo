@@ -15,6 +15,7 @@
 #
 
 import tensorflow as tf
+import tensorflow
 import numpy as np
 import ray
 import os
@@ -53,14 +54,23 @@ class ModelWorker(object):
         return self.gradient
 
     def push(self, *gradients):
+        start = time.time()
         self.gradient = np.mean(gradients, axis=0)
+        end = time.time()
+        print("Time for worker mean grads: {}".format(end - start))
         return 0
 
     # TODO: pass in num_splits here.
     def concate_and_split(self, *gradients):
+        start = time.time()
         flat_grads = np.concatenate(gradients)
-        return utils.split(flat_grads, self.num_ps)
+        end_concat = time.time()
+        result = utils.split(flat_grads, self.num_ps)
+        end = time.time()
+        print("Time for worker concat grads: {}".format(end_concat - start))
+        print("Time for worker split grads: {}".format(end - end_concat))
 
+        return result
 
     def ip(self):
         import ray.services as rservices
@@ -74,6 +84,7 @@ class ModelWorker(object):
         """
         start = time.time()
         flat_parameters = np.concatenate(parameters)
+        end_of_concat = time.time()
         self.modelAdapter.set_flat_trainable_weights(flat_parameters)
         set_weight_end = time.time()
         input_data, label_data = self.ray_data_set.next_batch()
@@ -83,15 +94,19 @@ class ModelWorker(object):
         compute_end = time.time()
         self.loss = loss_gradients[0]
         self.training_grads = loss_gradients[1:]
-        print("loss is {}".format(self.loss))
         flat_grads = np.concatenate([g.flatten() for g in self.training_grads])
-        print("flat_grads {}".format(flat_grads.shape))
+        end_of_concat_again = time.time()
         sharded_grads = utils.split(flat_grads, self.num_models_per_node)
         end = time.time()
-        print("set_weight: {}".format(set_weight_end - start))
-        print("get_data_end: {}".format(get_data_end - set_weight_end))
-        print("compute end: {}".format(compute_end - get_data_end))
-        print("Time for pull and execute: {}".format(end - start))
+        print("loss is {}".format(self.loss))
+        print("flat_grads {}".format(flat_grads.shape))
+        print("Time for worker concat weight: {}".format(end_of_concat - start))
+        print("Time for worker set_weight: {}".format(set_weight_end - end_of_concat))
+        print("Time for worker get data: {}".format(get_data_end - set_weight_end))
+        print("Time for worker fb: {}".format(compute_end - get_data_end))
+        print("Time for worker concat grads: {}".format(end_of_concat_again - compute_end))
+        print("Time for worker split grads: {}".format(end - end_of_concat_again))
+        print("Time for worker execution: {}".format(end - start))
         return sharded_grads
 
 
