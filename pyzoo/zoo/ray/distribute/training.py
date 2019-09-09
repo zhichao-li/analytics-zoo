@@ -63,7 +63,7 @@ class RayModel(object):
         self.x = self._preprocess_input(x, y)
         self._init_distributed_engine()
         for i in range(1, steps + 1):
-            self.step2(i)
+            self.step(i)
             if i % 1000 == 0:
                 self.modelAdapter.set_flat_trainable_weights(
                     ray.get(self.workers[0].get_flat_trainable_weights.remote()))
@@ -146,79 +146,36 @@ class RayModel(object):
                 ShardedParameterServer.remote(sharded_weight_ids[ps_index],
                                               modelLite=self.model_lite,
                                               ))
-        self._colocate_model_workers()
 
-    def _colocate_model_workers(self):
-        result = []
-        for ip in self.ip_to_worker.keys():
-            num = len(self.ip_to_worker.get(ip))
-            self.ip_to_num_workers[ip] = num
-            for worker in self.ip_to_worker.get(ip):
-                result.append(worker.set_num_ps.remote(len(self.pss)))
-                result.append(worker.set_num_models_per_node.remote(num))
-        ray.wait(result, num_returns=len(result))
-
-
-    def step2(self, step_id):
+    def step(self, step_id):
         start = time.time()
         # workers of sharded_grads
         sharded_grad_ids = []
         results = []
         losses = []
-        co_agg_tasks = []
-        for ip in self.ip_to_worker.keys():
-            co_workers = self.ip_to_worker.get(ip)
-            grads_tmp = [] # [[g0, g1], [g0, g1]]
-
+        for worker in self.workers:
             # 1) pull the latest weights from ps
             parameters = [ps.pull.remote() for ps in self.pss]
-            num_co_workers = len(co_workers)
-            for worker in co_workers:
-                # 2) compute the grads
-                sharded_grad = worker.pull_and_execute._remote(args=parameters, kwargs=None,
-                                                               num_return_vals=num_co_workers)  # returning is #ps , not #models
-                grads_tmp.append(sharded_grad)
-                losses.append(worker.get_loss.remote())
-            if len(grads_tmp) == 1:  # only one node
-                grads_per_worker = grads_tmp
-            else:  # TODO: support multi node and single model (single model would throw exception for now.)
-                grads_per_worker = list(zip(*grads_tmp)) # [(g0, g0), (g1, g1)]
-            # print("grads ####")
-            # print("ip #### %s" % ip) # 4node 2model ==> error 2, 2, 1, 1, 2
-            # print(grads_per_worker)
-            # One model per node
-            if not isinstance(grads_per_worker[0], Iterable):
-                grads_per_worker = [[grads] for grads in grads_per_worker]
-            for index, grads in enumerate(grads_per_worker):
-                co_agg_tasks.append(co_workers[index].push.remote(*grads))
-        before_local_wait = time.time()
-        ray.wait(object_ids=co_agg_tasks, num_returns=len(co_agg_tasks))
-        local_end = time.time()
-        print("local aggregation waiting: {}".format(local_end - before_local_wait))
-        print("local aggregation: {}".format(local_end - start))
-        for ip in self.ip_to_worker.keys():
-            workers = self.ip_to_worker.get(ip)
-            grads = [worker.pull.remote() for worker in workers] # [g0, g1, g2]
-            # The first worker of a node is responsible for concat and re-split the grads
-            resharded_grads = workers[0].concate_and_split._remote(args=grads,
-                                                                   kwargs=None, num_return_vals=len(self.pss))
-            sharded_grad_ids.append(utils.to_list(resharded_grads)) # ([g0, g1, g2], [g0, g1, g2])
-        if len(sharded_grad_ids) == 1:
-            grads_per_ps = sharded_grad_ids
-        else:
-            grads_per_ps = list(zip(*sharded_grad_ids))
-        assert len(grads_per_ps[0]) == len(self.pss), "{} == {}".format(len(grads_per_ps[0]), len(self.pss))
+            # 2) compute the grads
+            sharded_grad = worker.pull_and_execute._remote(args=parameters, kwargs=None, num_return_vals=self.num_worker)
+            sharded_grad_ids.append(sharded_grad)
+            losses.append(worker.get_loss.remote())
+
+        grads_per_ps = list(zip(*sharded_grad_ids))
+        assert len(grads_per_ps[0]) == self.num_worker, "we should get correct grads for each ps"
         # 3) push and aggregate grads on ps
         for index, grads in enumerate(grads_per_ps):
             results.append(self.pss[index].push.remote(*grads))
-        before_wait = time.time()
         # wait for complete
+        before_wait = time.time()
         ray.wait(object_ids=results, num_returns=len(results))
         end = time.time()
         avg_loss = np.mean([ray.get(loss) for loss in losses])
         throughput = self.batch_size / (end - start)
-        print("total time: {}".format(end -start))
-        print("across aggregate waitting time:{}".format(end - before_wait))
-        print("across aggregate: {}".format(end - local_end))
         print("Iteration: {}, throughput: {}, loss: {}".format(step_id, throughput, avg_loss))
+        print("total time: {}".format(end -start))
+        print("across aggregate waiting time:{}".format(end - before_wait))
+        print("Iteration: {}, throughput: {}, loss: {}".format(step_id, throughput, avg_loss))
+
+
 

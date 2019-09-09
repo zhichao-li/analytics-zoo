@@ -34,43 +34,16 @@ class ModelWorker(object):
         self.loss = 0
         self.gradient = None
         self.training_grads = None
-        # TODO: Move this to remote function
-        self.num_ps = None
-        self.num_models_per_node=None
-    def get_num_ps(self):
-        return self.num_ps
 
-    def get_num_models_per_node(self):
-        return self.num_models_per_node
-
-
-    def set_num_ps(self, num_ps):
-        self.num_ps = num_ps
-
-    def set_num_models_per_node(self, num):
-        self.num_models_per_node=num
-
-    def pull(self):
-        return self.gradient
-
-    def push(self, *gradients):
-        start = time.time()
-        self.gradient = np.mean(gradients, axis=0)
-        end = time.time()
-        print("Time for worker mean grads: {}".format(end - start))
-        return 0
-
-    # TODO: pass in num_splits here.
-    def concate_and_split(self, *gradients):
-        start = time.time()
-        flat_grads = np.concatenate(gradients)
-        end_concat = time.time()
-        result = utils.split(flat_grads, self.num_ps)
-        end = time.time()
-        print("Time for worker concat grads: {}".format(end_concat - start))
-        print("Time for worker split grads: {}".format(end - end_concat))
-
-        return result
+    # def pull(self):
+    #     return self.gradient
+    #
+    # def push(self, *gradients):
+    #     start = time.time()
+    #     self.gradient = np.mean(gradients, axis=0)
+    #     end = time.time()
+    #     print("Time for worker mean grads: {}".format(end - start))
+    #     return 0
 
     def ip(self):
         import ray.services as rservices
@@ -109,8 +82,6 @@ class ModelWorker(object):
         print("Time for worker execution: {}".format(end - start))
         return sharded_grads
 
-
-    # def pull_and_execute(self, ):
 
     def get_loss(self):
         # TODO: this should be combined with set_parameters_compute_gradients, but we cannot return

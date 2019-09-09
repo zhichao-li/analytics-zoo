@@ -68,7 +68,6 @@ class ShardedParameterServer(MKLSetting):
         :param gradients:
         :return: updated weights
         """
-        # TODO: MKL here?
         #print(np.mean(gradients, axis=0).shape)
         mean_start = time.time()
         agg_grad = np.mean(gradients, axis=0).reshape(self.parameters.shape)
