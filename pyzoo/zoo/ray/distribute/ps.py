@@ -75,7 +75,7 @@ class ShardedParameterServer(MKLSetting):
         _, parameters = self.sess.run([self.apply_op, self.weight_var], feed_dict={self.grad_holder: agg_grad})
         self.parameters = parameters
         apply_grads_end = time.time()
-        print(self.parameters.shape)
-        print("Time for ps mean grads: {}".format(mean_end - mean_start))
-        print("Time for ps apply_grads: {}".format(apply_grads_end - mean_end))
+        # print(self.parameters.shape)
+        # print("Time for ps mean grads: {}".format(mean_end - mean_start))
+        # print("Time for ps apply_grads: {}".format(apply_grads_end - mean_end))
         return "success"

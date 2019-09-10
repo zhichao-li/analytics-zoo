@@ -22,8 +22,8 @@ keras_model.compile(loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
 # keras_model.save("/opt/work/tt.model")
 
-num_nodes = 1
-model_per_node = 2
+num_nodes = 2
+model_per_node = 1
 resource={"trainer": num_nodes * model_per_node, "ps": num_nodes }
 ray.init(local_mode=False, log_to_driver=True, resources=resource)
 batch_size = 128 * num_nodes * model_per_node
@@ -36,6 +36,8 @@ y_train = y_train.reshape((-1, 1))
 x_test = x_test.reshape((-1, 28, 28, 1))
 y_test = y_test.reshape((-1, 1))
 x_train, x_test = x_train / 255.0, x_test / 255.0
+
+ray.timeline(filename="/tmp/timeline.json")
 
 
 rayModel = RayModel.from_keras_model(keras_model)

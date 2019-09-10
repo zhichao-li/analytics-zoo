@@ -118,11 +118,12 @@ class RayModel(object):
     def _init_distributed_engine(self):
         self.workers = []
         self.pss = []
+
         logger.info(
             "Creating model workers ({} total)".format(self.num_worker))
         for worker_index in range(self.num_worker):
             self.workers.append(
-                ModelWorker.remote(self.model_lite, self.x))
+                ModelWorker.remote(self.model_lite, self.x, self.num_nodes))
         self.ip_to_worker = {}
         self.ip_to_num_workers = {}
 

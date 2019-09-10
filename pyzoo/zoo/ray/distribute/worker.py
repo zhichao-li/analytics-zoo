@@ -28,12 +28,13 @@ from zoo.ray.util import utils
 
 @ray.remote(resources={"trainer":1})
 class ModelWorker(object):
-    def __init__(self, modelLite, ray_data_set):
+    def __init__(self, modelLite, ray_data_set, num_ps):
         self.modelAdapter = modelLite.to_adapter()
         self.ray_data_set = ray_data_set.action()
         self.loss = 0
         self.gradient = None
         self.training_grads = None
+        self.num_ps = num_ps
 
     # def pull(self):
     #     return self.gradient
@@ -69,17 +70,17 @@ class ModelWorker(object):
         self.training_grads = loss_gradients[1:]
         flat_grads = np.concatenate([g.flatten() for g in self.training_grads])
         end_of_concat_again = time.time()
-        sharded_grads = utils.split(flat_grads, self.num_models_per_node)
+        sharded_grads = utils.split(flat_grads, self.num_ps)
         end = time.time()
-        print("loss is {}".format(self.loss))
-        print("flat_grads {}".format(flat_grads.shape))
-        print("Time for worker concat weight: {}".format(end_of_concat - start))
-        print("Time for worker set_weight: {}".format(set_weight_end - end_of_concat))
-        print("Time for worker get data: {}".format(get_data_end - set_weight_end))
+        # print("loss is {}".format(self.loss))
+        # print("flat_grads {}".format(flat_grads.shape))
+        # print("Time for worker concat weight: {}".format(end_of_concat - start))
+        # print("Time for worker set_weight: {}".format(set_weight_end - end_of_concat))
+        # print("Time for worker get data: {}".format(get_data_end - set_weight_end))
         print("Time for worker fb: {}".format(compute_end - get_data_end))
-        print("Time for worker concat grads: {}".format(end_of_concat_again - compute_end))
-        print("Time for worker split grads: {}".format(end - end_of_concat_again))
-        print("Time for worker execution: {}".format(end - start))
+        # print("Time for worker concat grads: {}".format(end_of_concat_again - compute_end))
+        # print("Time for worker split grads: {}".format(end - end_of_concat_again))
+        # print("Time for worker execution: {}".format(end - start))
         return sharded_grads
 
 
