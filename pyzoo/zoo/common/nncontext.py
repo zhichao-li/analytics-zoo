@@ -163,7 +163,7 @@ def init_env():
     # Default env
     kmp_affinity = "granularity=fine,compact,1,0"
     kmp_settings = "1"
-    omp_num_threads = "1"
+    omp_num_threads = "44"
     kmp_blocktime = "0"
 
     # Check env and override if necessary
